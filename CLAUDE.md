@@ -62,9 +62,29 @@ Use these instead of their traditional counterparts. They're installed and expec
 | `cd` | `zoxide` (`z`) | Jump to frecent directories |
 | `jq` for JSON | `jq` | Installed for JSON processing |
 
-## GitHub Operations — Use `gh` CLI (NOT MCP)
+## Source Control — GitLab is master, GitHub is a mirror
 
-Always use `gh` CLI for all GitHub operations (issues, PRs, releases, API calls).
+`origin` is the **local-ci-cd GitLab on `home-lab`**
+(`http://home-lab.tailac3c7a.ts.net:8080/root/local-image-generator.git`).
+Branches, merge requests and issues live there. `github`
+(`https://github.com/fxmartin/local-image-generator`) is a named remote kept
+only so the push mirror has somewhere to land.
+
+- **Never push to `github`, and never merge on GitHub.** GitLab push-mirrors to
+  it; anything committed on the GitHub side is divergent history that the next
+  mirror run will fight with.
+- **Always use the tailnet FQDN** `home-lab.tailac3c7a.ts.net`, never the bare
+  `home-lab`: on the XPS the bare name also resolves to an unreachable global
+  IPv6 via the `fritz.box` search domain, and `glab`/`git` then hang for ~2 min.
+- Use `glab` for merge requests, issues and API calls. It is authenticated at
+  the instance level (token in the OS keyring). `--hostname` will not take a
+  `host:port`, so set `GITLAB_HOST=home-lab.tailac3c7a.ts.net:8080`.
+- `gh` remains correct for reading the GitHub mirror, and for any *other* repo
+  that still has GitHub as its master.
+- The `sdlc` controller's GitHub PR flow is **not authoritative** here.
+  `.sdlc-forge.yaml` points it at GitLab; issue numbers are GitLab iids.
+- Mirror lag is up to five minutes and GitLab enforces a backoff between runs.
+  A stale `github/main` is expected, not a fault.
 
 ## Testing Strategy
 
