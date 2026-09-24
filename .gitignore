@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Model weights & generated output (never commit)
+models/
+*.gguf
+*.safetensors
+outputs/
+
+# Environment & secrets
+.env
+.env.*
+
+# Editors / OS
+.DS_Store
+.vscode/
+.idea/
+*.log

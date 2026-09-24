@@ -1,0 +1,4 @@
+# Agent harness for this repo. Precedence: --harness flag > this file >
+# installed registry default > built-in claude. See `sdlc doctor`.
+harness:
+  default: claude
