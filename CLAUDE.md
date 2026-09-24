@@ -100,9 +100,44 @@ Engine-specific guidance defaults live in the adapter (sd.cpp cfg 6.0 Euler;
 mflux guidance 1.0). Weights are never committed (`models/`, `*.gguf`,
 `*.safetensors` are gitignored).
 
+## Story Management Protocol
+
+### Single Source of Truth
+The `docs/stories/` directory and its epic files are the **single source of truth** for all story definitions, progress tracking, and acceptance criteria.
+
+### Story File Hierarchy
+```
+docs/STORIES.md (overview and navigation)
+└── docs/stories/
+    ├── epic-01-foundation.md
+    ├── epic-02-xps-engines.md
+    ├── epic-03-model-management.md
+    ├── epic-04-generation-commands.md
+    ├── epic-05-release-docs.md
+    ├── epic-06-remote-serving.md
+    ├── epic-07-mlx-apple-silicon.md
+    ├── epic-08-polish.md
+    └── non-functional-requirements.md
+```
+
+### Progress Update Protocol
+1. Update story completion checkboxes in epic files
+2. Update sprint breakdown tables in each epic
+3. Mark completed acceptance criteria
+4. Update dependency tracking
+5. Track completed story points in epic progress sections
+
+### Development Workflow
+- **Sprint Planning**: Use epic files for story selection
+- **Code Reviews**: Link PRs to story IDs (e.g., "Implements Story 01.2-001")
+- **Deployment**: Update story status in epic files post-deployment
+- **Updates**: Maintain within 24 hours of story completion
+- **Phase gate**: Story 02.1-004 (XPS bench decision) must close before any Epic-04 story that depends on a real engine starts
+
 ## Key Docs
 
 - `REQUIREMENTS.md` — PRD: P0/P1/P2 requirements, phases, DoD, risks
+- `docs/STORIES.md` — Epic overview, MVP scope, dependencies, sprint plan
+- `docs/stories/` — Epic files with stories and acceptance criteria (source of truth)
 - `PROJECT-SEED.md` — Project seed data from `/project-init`
 - `docs/bench/` — Per-host engine benchmarks (created in Phase 0)
-<!-- Epics/stories populated after /generate-epics -->
