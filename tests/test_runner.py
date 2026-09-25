@@ -8,7 +8,7 @@ import pytest
 from rich.console import Console
 
 from lig.backends.base import EngineError
-from lig.backends.runner import run_engine
+from lig.backends.runner import parse_progress, run_engine
 from lig.core.logs import EngineLog
 
 
@@ -153,3 +153,28 @@ def test_unkillable_child_does_not_hang_the_reaper(monkeypatch):
 
     monkeypatch.setattr(runner, "_signal_group", lambda proc, sig: None)
     runner._terminate_group(StuckProc(), grace=0.01)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("line", "expected"),
+    [
+        ("step 3/40", (3, 40)),
+        ("  |======>                          | 6/40 - 35.60s/it", (6, 40)),
+        ("  |==>                              | 2/40 - 1.25it/s", (2, 40)),
+    ],
+)
+def test_parse_progress_reads_sampling_lines(line, expected):
+    assert parse_progress(line) == expected
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        # sd.cpp's tensor-loading bars look like sampling bars but report bytes/s.
+        "  |##################################################| 397/399 - 1.36GB/s",
+        "  |###############                                   | 36/128 - 505.33MB/s",
+        "[VERBOSE] model_loader.cpp:1087 - loading 11/265 tensors from qwen.gguf",
+    ],
+)
+def test_parse_progress_ignores_tensor_loading_bars(line):
+    assert parse_progress(line) is None

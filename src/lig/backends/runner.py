@@ -13,8 +13,20 @@ from typing import IO
 from lig.backends.base import EngineError, ProgressCallback
 from lig.core.logs import TAIL_LINES, EngineLog
 
-# Matches `step 3/40` and sd.cpp's `|3/40 - 1.2s/it` progress bar.
-PROGRESS_PATTERN = re.compile(r"(?:\bstep\s+|\|\s*)(\d+)/(\d+)")
+# Matches `step 3/40` and sd.cpp's sampling bar `| 3/40 - 1.2s/it` (or `it/s`). sd.cpp's
+# tensor-loading bars (`| 397/399 - 1.36GB/s`) share the shape, so the rate unit is required.
+PROGRESS_PATTERN = re.compile(r"\bstep\s+(\d+)/(\d+)|\|\s*(\d+)/(\d+)\s*-\s*[\d.]+\s*(?:s/it|it/s)")
+
+
+def parse_progress(line: str) -> tuple[int, int] | None:
+    """Return ``(done, total)`` for an engine progress line, or ``None`` for anything else."""
+    match = PROGRESS_PATTERN.search(line)
+    if match is None:
+        return None
+    done, total = (match[1], match[2]) if match[1] else (match[3], match[4])
+    return int(done), int(total)
+
+
 DEFAULT_GRACE_SECONDS = 5.0
 REAP_HEADROOM_SECONDS = 10.0
 POLL_SECONDS = 0.1
@@ -84,10 +96,10 @@ def run_engine(
                 log.write(line)
                 if is_stderr:
                     stderr_tail.append(line)
-            match = PROGRESS_PATTERN.search(line)
-            if match and on_progress is not None and not cancelled.is_set():
+            progress = parse_progress(line)
+            if progress and on_progress is not None and not cancelled.is_set():
                 try:
-                    on_progress(int(match[1]), int(match[2]))
+                    on_progress(*progress)
                 except BaseException:  # noqa: BLE001 - surface in main thread as cancel
                     cancelled.set()
                     _signal_group(proc, signal.SIGTERM)
