@@ -71,3 +71,28 @@ def test_list_json_reports_status_and_totals(models_dir):
     assert data["cache_bytes"] == 5
     assert data["free_bytes"] > 0
     assert data["models_dir"] == str(models_dir)
+
+
+def test_human_size_scales_through_terabytes():
+    assert cache.human_size(512) == "512 B"
+    assert cache.human_size(1536) == "1.5 KB"
+    assert cache.human_size(5 * 1024**4) == "5.0 TB"
+
+
+def test_list_reports_error_when_config_invalid(models_dir, tmp_path):
+    bad = tmp_path / "cfg" / "lig"
+    bad.mkdir(parents=True)
+    (bad / "config.toml").write_text("not = [valid")
+    result = runner.invoke(app, ["models", "list"])
+    assert result.exit_code == 1
+    assert "error:" in result.output
+
+
+def test_list_reports_error_when_cache_dir_unusable(models_dir, monkeypatch):
+    def boom(path):
+        raise OSError("read-only file system")
+
+    monkeypatch.setattr(cache, "ensure_models_dir", boom)
+    result = runner.invoke(app, ["models", "list"])
+    assert result.exit_code == 1
+    assert "read-only file system" in result.output
