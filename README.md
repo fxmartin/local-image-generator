@@ -52,6 +52,13 @@ env vars, e.g. `LIG_SERVE__BIND`.
 - Unknown keys in the file produce a warning naming the key and line; the run continues.
 - `output_dir` and `models_dir` expand a leading `~` to your home directory.
 
+Model weights are cached under the platform cache dir (`~/.cache/lig/models` on Linux);
+override with `LIG_MODELS_DIR` or `models_dir`. The directory is created on first use.
+
+`lig models list [--engine sdcpp] [--json]` shows each artifact's name, role, engines, size,
+license and status (`installed`, `missing`, `partial` = a `.part` file exists, `unverified` =
+present without a `.sha256.ok` marker), plus total cache size and free disk.
+
 Keys: `engine`, `output_dir`, `models_dir`, `default_host`, `steps`, `size`, `serve.bind`.
 
 ## Diagnostics

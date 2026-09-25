@@ -29,7 +29,7 @@ class Settings(BaseModel):
 
     engine: str = "auto"
     output_dir: Path = Path("./outputs")
-    models_dir: Path = Path(platformdirs.user_data_dir("lig")) / "models"
+    models_dir: Path = Path(platformdirs.user_cache_dir("lig")) / "models"
     default_host: str | None = None
     steps: int = 40
     size: str = "1024x1024"
@@ -191,7 +191,7 @@ CONFIG_TEMPLATE = """\
 # output_dir = "./outputs"
 
 # Where model weights are cached.
-# models_dir = "~/.local/share/lig/models"
+# models_dir = "~/.cache/lig/models"
 
 # Remote `lig serve` host on the tailnet, used by the remote engine.
 # default_host = "macbook-pro-m3-max.tailac3c7a.ts.net:8765"

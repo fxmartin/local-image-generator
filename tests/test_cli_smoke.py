@@ -15,7 +15,7 @@ def test_help_lists_all_subcommands():
         assert name in result.output
 
 
-STUBS = [n for n in SUBCOMMANDS if n not in ("config", "doctor")]
+STUBS = [n for n in SUBCOMMANDS if n not in ("config", "models", "doctor")]
 
 
 @pytest.mark.parametrize("name", STUBS)
