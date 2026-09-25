@@ -77,6 +77,13 @@ and the command exits 1. `lig models rm NAME [--yes]` deletes the artifact and a
 default engine needs it. `lig models path NAME` prints the absolute path of an installed
 artifact; if it is not installed it prints nothing and exits 1.
 
+The shipped registry seeds three sets: `sdcpp-q4` (default: Q4_K transformer, Qwen3-VL-8B Q4_K_M
+text encoder, 2.1 VAE, mmproj), `sdcpp-q8` (Q8_0 transformer instead; opt-in alternative) and
+`ncnn-bf16` (the ~31 GB BF16 model folder, stored under `qwenimage21/` in the cache). Each
+entry records its license and the engine build it was measured with (`pinned_engine`). The
+transformer, VAE and ncnn files are under the Qwen Research License (research/evaluation use
+only), not Apache-2.0. The 2.1 VAE is not interchangeable with earlier Qwen-Image VAEs.
+
 Keys: `engine`, `output_dir`, `models_dir`, `default_host`, `ncnn_binary`, `ncnn_model_dir`, `steps`, `size`, `serve.bind`.
 The `ncnn` engine needs `ncnn_binary` (or `qwenimage-ncnn-vulkan` on `PATH`) and `ncnn_model_dir` (the `qwenimage21/` folder); it prints no per-step progress, so expect a spinner with elapsed time.
 

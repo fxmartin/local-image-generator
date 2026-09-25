@@ -84,7 +84,7 @@ def test_edit_adds_mmproj_and_reference(backend, models_dir, tmp_path, read_stub
 
 
 def test_edit_without_mmproj_raises(models_dir, tmp_path, stub_bin_dir):
-    (models_dir / "qwen2.5-vl-7b-mmproj-f16.gguf").unlink()
+    (models_dir / "mmproj-Qwen3VL-8B-Instruct-F16.gguf").unlink()
     backend = SdcppBackend(models_dir=models_dir, log_dir=tmp_path / "l", platform="linux")
     request = EditRequest(prompt="x", reference_image=tmp_path, reference_sha256="a" * 64)
     with pytest.raises(WeightsMissing, match="mmproj"):
@@ -107,7 +107,7 @@ def test_available_ok(backend):
 
 
 def test_available_reports_missing_mmproj_but_still_ok(models_dir, tmp_path, stub_bin_dir):
-    (models_dir / "qwen2.5-vl-7b-mmproj-f16.gguf").unlink()
+    (models_dir / "mmproj-Qwen3VL-8B-Instruct-F16.gguf").unlink()
     backend = SdcppBackend(models_dir=models_dir, log_dir=tmp_path, platform="linux")
     result = backend.available()
     assert result.ok and result.reason == "edit unsupported: mmproj missing"
@@ -135,8 +135,8 @@ def test_available_explicit_binary_path(models_dir, tmp_path, stub_bin_dir):
 
 
 def test_available_names_first_missing_weight(models_dir, tmp_path, stub_bin_dir):
-    (models_dir / "qwen-image-2.1-vae.safetensors").unlink()
-    (models_dir / "qwen2.5-vl-7b-Q4_K_M.gguf").unlink()
+    (models_dir / "qwen_image_2.1_vae_bf16.safetensors").unlink()
+    (models_dir / "Qwen3VL-8B-Instruct-Q4_K_M.gguf").unlink()
     backend = SdcppBackend(models_dir=models_dir, log_dir=tmp_path, platform="linux")
     result = backend.available()
     assert not result.ok
@@ -145,7 +145,7 @@ def test_available_names_first_missing_weight(models_dir, tmp_path, stub_bin_dir
 
 
 def test_partial_download_is_not_available(models_dir, tmp_path, stub_bin_dir):
-    (models_dir / "qwen-image-2.1-vae.safetensors.part").write_bytes(b"x")
+    (models_dir / "qwen_image_2.1_vae_bf16.safetensors.part").write_bytes(b"x")
     backend = SdcppBackend(models_dir=models_dir, log_dir=tmp_path, platform="linux")
     assert not backend.available().ok
 

@@ -83,6 +83,8 @@ def pull_artifact(
         marker.unlink(missing_ok=True)
         target.unlink(missing_ok=True)
 
+    # Bundle artifacts (ncnn) live in subfolders of the models dir.
+    target.parent.mkdir(parents=True, exist_ok=True)
     offset = part.stat().st_size if part.is_file() else 0
     headers = {"Range": f"bytes={offset}-"} if offset else {}
     try:
