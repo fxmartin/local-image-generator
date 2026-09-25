@@ -35,8 +35,18 @@ Without the `serve` extra, `lig serve` exits with a one-line hint to install it.
 uv sync            # install runtime + dev dependencies
 uv run lig --help  # list subcommands (all stubs for now)
 uv run ruff check .
+uv run ruff format --check .
 uv run pytest      # coverage gate: 85 % on core, models, cli
 ```
+
+CI (`.gitlab-ci.yml`) runs the same three checks in an offline, root, Linux/arm64
+container with `uv sync --frozen --offline` from a pre-populated `UV_CACHE_DIR`.
+Tests therefore:
+
+- cannot open sockets (an autouse guard in `tests/conftest.py` raises; opt out with
+  `@pytest.mark.network`, unused in v1);
+- must not rely on filesystem permissions, which no-op as root. If unavoidable, mark
+  the test `@requires_non_root` (skips with an explicit `euid == 0` reason).
 
 Optional extras: `lig[serve]` (FastAPI daemon), `lig[mlx]` (mflux on Apple Silicon).
 

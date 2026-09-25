@@ -1,0 +1,25 @@
+# Runs on the local-ci-cd GitLab (home-lab): Linux/arm64 container, root, NO network.
+# Everything below must work offline; see CLAUDE.md "CI/CD".
+
+variables:
+  # Pin by digest on the runner side (set LIG_CI_IMAGE in project CI/CD variables to
+  # `<image>@sha256:<digest>`); the tag here is only a fallback for local repro.
+  LIG_CI_IMAGE: ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+  # Pre-populated wheel cache provided by the platform's toolbox volume. Never fetch.
+  UV_CACHE_DIR: /opt/uv-cache
+  UV_OFFLINE: "1"
+  UV_PYTHON_DOWNLOADS: never
+  UV_LINK_MODE: copy
+
+stages:
+  - test
+
+test:
+  stage: test
+  image: $LIG_CI_IMAGE
+  script:
+    - uv sync --frozen --offline
+    - uv run ruff check .
+    - uv run ruff format --check .
+    # Coverage gate (fail_under = 85) lives in pyproject.toml; pytest exits non-zero below it.
+    - uv run pytest --cov
