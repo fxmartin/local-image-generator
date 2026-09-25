@@ -6,6 +6,7 @@ import lig.cli.app as cli_app
 from lig.backends.base import Availability
 from lig.core import doctor
 from lig.core.doctor import PlatformInfo
+from lig.models.registry import Artifact, Registry
 
 runner = CliRunner()
 
@@ -86,20 +87,55 @@ def test_disk_free_walks_to_existing_parent(tmp_path):
     assert doctor.disk_free_bytes(tmp_path / "a" / "b") > 0
 
 
+def _artifact(name: str, filename: str, engine: str) -> Artifact:
+    return Artifact(
+        name=name,
+        repo="r/r",
+        filename=filename,
+        sha256="0" * 64,
+        size_bytes=1,
+        engines=[engine],
+        role="transformer",
+        license="apache-2.0",
+        url="https://example.invalid/x",
+    )
+
+
+def _registry() -> Registry:
+    return Registry(
+        artifacts=[
+            _artifact("sd-a", "a.gguf", "sdcpp"),
+            _artifact("sd-b", "b.gguf", "sdcpp"),
+            _artifact("nc-c", "c.bin", "ncnn"),
+        ]
+    )
+
+
 def test_report_rows_and_cached_weights(tmp_path):
-    (tmp_path / "sdcpp").mkdir()
-    (tmp_path / "sdcpp" / "w.gguf").write_bytes(b"12345")
+    # `lig models pull` stores weights flat in the models dir, next to their markers.
+    (tmp_path / "a.gguf").write_bytes(b"12345")
+    (tmp_path / "a.gguf.sha256.ok").write_text("ok")
     engines = _factories(
         _Engine("sdcpp", False, "sd-cli not found on PATH (set engines.sdcpp.binary)"),
         _Engine("fake", True),
     )
-    report = doctor.build_report(xps_info(str(tmp_path)), engines)
+    report = doctor.build_report(xps_info(str(tmp_path)), engines, registry=_registry())
     rows = {r["engine"]: r for r in report["engines"]}
     assert rows["sdcpp"]["status"] == "unavailable"
     assert rows["sdcpp"]["reason"].startswith("sd-cli not found on PATH")
     assert rows["sdcpp"]["cached_files"] == 1 and rows["sdcpp"]["cached_bytes"] == 5
+    assert rows["fake"]["cached_files"] == 0
     assert rows["fake"]["status"] == "available"
     assert report["platform"]["vulkan_icd"] is True
+
+
+def test_cached_weights_ignore_files_of_other_engines(tmp_path):
+    (tmp_path / "c.bin").write_bytes(b"123")
+    engines = _factories(_Engine("sdcpp", True), _Engine("ncnn", True))
+    report = doctor.build_report(xps_info(str(tmp_path)), engines, registry=_registry())
+    rows = {r["engine"]: r for r in report["engines"]}
+    assert rows["sdcpp"]["cached_files"] == 0
+    assert rows["ncnn"]["cached_files"] == 1 and rows["ncnn"]["cached_bytes"] == 3
 
 
 def test_report_engine_constructor_failure_is_unavailable():

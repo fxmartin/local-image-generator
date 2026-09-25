@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from lig.backends.base import Backend
+from lig.models.registry import Registry, load_registry
 
 VULKAN_ICD_DIRS = [Path("/usr/share/vulkan/icd.d"), Path("/etc/vulkan/icd.d")]
 ONEAPI_DIR = Path("/opt/intel/oneapi")
@@ -137,19 +138,25 @@ def collect_platform_info(
     )
 
 
-def _cached(models_dir: Path, engine: str) -> tuple[int, int]:
-    root = models_dir / engine
-    files = [p for p in root.rglob("*") if p.is_file()] if root.is_dir() else []
+def _cached(models_dir: Path, engine: str, registry: Registry) -> tuple[int, int]:
+    """Count this engine's registry weight files present in the (flat) models dir."""
+    files = [
+        models_dir / a.filename
+        for a in registry.artifacts
+        if engine in a.engines and (models_dir / a.filename).is_file()
+    ]
     return len(files), sum(p.stat().st_size for p in files)
 
 
-def _engine_row(name: str, factory: Callable[[], Backend], models_dir: Path) -> dict[str, Any]:
+def _engine_row(
+    name: str, factory: Callable[[], Backend], models_dir: Path, registry: Registry
+) -> dict[str, Any]:
     try:
         availability = factory().available()
         ok, reason = availability.ok, availability.reason
     except Exception as exc:  # a broken adapter must not hide the other rows
         ok, reason = False, f"{type(exc).__name__}: {exc}"
-    files, size = _cached(models_dir, name)
+    files, size = _cached(models_dir, name, registry)
     return {
         "engine": name,
         "status": "available" if ok else "unavailable",
@@ -160,10 +167,13 @@ def _engine_row(name: str, factory: Callable[[], Backend], models_dir: Path) -> 
 
 
 def build_report(
-    info: PlatformInfo, engines: Mapping[str, Callable[[], Backend]]
+    info: PlatformInfo,
+    engines: Mapping[str, Callable[[], Backend]],
+    registry: Registry | None = None,
 ) -> dict[str, Any]:
     models_dir = Path(info.models_dir)
+    registry = registry or load_registry()
     return {
         "platform": asdict(info),
-        "engines": [_engine_row(n, f, models_dir) for n, f in sorted(engines.items())],
+        "engines": [_engine_row(n, f, models_dir, registry) for n, f in sorted(engines.items())],
     }
