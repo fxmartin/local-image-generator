@@ -12,7 +12,7 @@ build/
 htmlcov/
 
 # Model weights & generated output (never commit)
-models/
+/models/
 *.gguf
 *.safetensors
 outputs/

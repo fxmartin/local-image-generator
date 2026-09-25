@@ -17,3 +17,14 @@ Pre-alpha. Phase 0 (engine benchmark on the Dell XPS 13) has not started. See:
 - [`CLAUDE.md`](./CLAUDE.md) — architecture, stack, engineering conventions
 
 Installation and usage docs land with story 05.1-001.
+
+## Development
+
+```
+uv sync            # install runtime + dev dependencies
+uv run lig --help  # list subcommands (all stubs for now)
+uv run ruff check .
+uv run pytest      # coverage gate: 85 % on core, models, cli
+```
+
+Optional extras: `lig[serve]` (FastAPI daemon), `lig[mlx]` (mflux on Apple Silicon).
