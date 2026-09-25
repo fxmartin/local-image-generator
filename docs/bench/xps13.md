@@ -8,8 +8,170 @@ shared RAM. Numbers here are recorded by hand; CI cannot run engines.
 | Item | Value |
 |---|---|
 | Kernel | `7.2.5-3-omarchy` |
-| GPU driver | `xe` kernel driver; Mesa `vulkan-intel 1:26.2.2-1` |
-| Vulkan device | `Intel(R) Graphics (LNL)`, integrated, UMA, fp16/bf16, cooperative matrix |
+| Vulkan device | `Intel(R) Graphics (LNL)`, integrated, UMA, fp16/bf16, `KHR_coopmat` |
+| Driver | Intel open-source Mesa driver, Mesa 26.2.2-arch1.1 (`vulkan-intel 1:26.2.2-1`) |
+| Vulkan API | 1.4.354 |
+| Toolchain | cmake 4.4.3, ninja 1.13.2, gcc 16.2.1 |
+
+## stable-diffusion.cpp, Vulkan (Story 02.1-001): works, 21 min at 1024²
+
+### Build
+
+Pinned commit `b167b942f77ecb17e7f78e163a8c32ff7ac95c10`
+(`master-913-b167b94`, 2026-09-25, "fix: align Qwen Image 2.1 flow schedule
+with official defaults (#2048)").
+
+The system has no `vulkan-headers` / `spirv-headers` packages and no
+passwordless sudo, so both were built from source into a local prefix
+(Vulkan-Headers `b0c3dd68`, SPIRV-Headers `cb42dec3`):
+
+```sh
+S=~/.cache/lig/spike
+git clone --depth 1 --recurse-submodules --shallow-submodules \
+  https://github.com/leejet/stable-diffusion.cpp $S/sdcpp
+git clone --depth 1 https://github.com/KhronosGroup/Vulkan-Headers $S/vulkan-headers
+git clone --depth 1 https://github.com/KhronosGroup/SPIRV-Headers  $S/spirv-headers
+for d in spirv-headers vulkan-headers; do
+  cmake -S $S/$d -B $S/$d/build -G Ninja -DCMAKE_INSTALL_PREFIX=$S/prefix
+  cmake --install $S/$d/build
+done
+cmake -S $S/sdcpp -B $S/sdcpp/build -G Ninja -DSD_VULKAN=ON \
+  -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=$S/prefix
+cmake --build $S/sdcpp/build -j6
+$S/sdcpp/build/bin/sd-cli --help
+```
+
+On a fresh machine, `pacman -S vulkan-headers spirv-headers shaderc` replaces
+the local-prefix step.
+
+### Weights
+
+Downloaded by hand to `~/.cache/lig/spike/sdcpp-models/`. Epic-03 reuses
+these hashes.
+
+| File | Source | Bytes | SHA-256 |
+|---|---|---|---|
+| `qwen_image_2.1-Q4_K.gguf` | `leejet/Qwen-Image-2.1-GGUF` | 4197494816 | `29f9c83c249ff0292fb2943fceddfa2319b446601866c82a4f8be062abea72c2` |
+| `Qwen3VL-8B-Instruct-Q4_K_M.gguf` | `Qwen/Qwen3-VL-8B-Instruct-GGUF` | 5027784800 | `67d1659bfe71b89d50b45a4ad1a9e5b997e5bb16ce5da66a6a6167abd569e9e2` |
+| `mmproj-Qwen3VL-8B-Instruct-F16.gguf` | `Qwen/Qwen3-VL-8B-Instruct-GGUF` | 1159029824 | `ca524100ebf825c9a870db1c580d03879e0da0ab2541697e2458e64891cf9d38` |
+| `qwen_image_2.1_vae_bf16.safetensors` | `Comfy-Org/Qwen-Image-2.1` (`vae/`) | 675509688 | `bb21f7473051e1ac368515dd3f2e15cd44d7a11748ee8823e1ddca3e4876b7c9` |
+
+### Timing method
+
+GNU `time` is not installed on the XPS, so [`timev.py`](timev.py) stands in
+for `/usr/bin/time -v`: it prints wall time and `ru_maxrss` of the child in
+the same "Maximum resident set size (kbytes)" form.
+
+Peak RSS undercounts memory on this UMA iGPU. sd.cpp keeps the weights in
+`Vulkan_Host` buffers, which are driver allocations and do not appear in the
+process RSS. The engine's own figure ("total params memory size") is the
+better number for weights.
+
+### Text-to-image, 1024², 40 steps, `--cfg-scale 6.0`
+
+```sh
+M=~/.cache/lig/spike/sdcpp-models
+python3 docs/bench/timev.py ~/.cache/lig/spike/sdcpp/build/bin/sd-cli \
+  --diffusion-model $M/qwen_image_2.1-Q4_K.gguf \
+  --vae $M/qwen_image_2.1_vae_bf16.safetensors \
+  --llm $M/Qwen3VL-8B-Instruct-Q4_K_M.gguf \
+  -p "a lovely cat holding a sign says 'qwen2.1.cpp'" \
+  -H 1024 -W 1024 --steps 40 --seed 42 --cfg-scale 6.0 \
+  --sampling-method euler --offload-to-cpu --fa -v -o out/t2i.png
+```
+
+| Metric | Value |
+|---|---|
+| Status | **PASS**, PNG written (`out/t2i.png`, sha256 `a0ee8a65…0d63`) |
+| Weights in memory | 8949.76 MB (text encoder 4302 MB, diffusion 4003 MB, VAE 644 MB) |
+| Load (tensor read + stage to Vulkan0, all three models) | ≈ 6 s |
+| Text conditioning | 3.80 s |
+| Sampling | 2649.16 s. Steps 1–11 took 75–90 s/it; from step 13 on it held at ≈ 60.3 s/it |
+| VAE decode | 51.12 s |
+| Total (`generate_image`) | 2704.12 s |
+| Wall clock (timev) | 2704.69 s (≈ 45 min) |
+| Peak RSS (timev) | 895864 kB (≈ 0.85 GB, see the UMA note above) |
+| Quality | Sharp photographic cat; the sign reads `qwen2.1.cpp` correctly with no artifacts |
+
+
+### Text-to-image, 1024², 40 steps, `--cfg-scale 1.0`
+
+Qwen-Image-2.1 is designed for guidance-free sampling at scale 1.0 (the
+default of mflux and ncnn, and what the reference article used). Above 1.0,
+every step runs the model twice: once with the prompt and once without. This
+run is identical to the one above except for `--cfg-scale 1.0`, `-o
+out/t2i-cfg1.png`, and a freshly rebooted XPS (driver GPU cache empty,
+`GPUReclaim` 42 MB, 21 GB available).
+
+| Metric | Value |
+|---|---|
+| Status | **PASS**, PNG written (`out/t2i-cfg1.png`, sha256 `4f55abb6…`) |
+| Text conditioning | 2.50 s |
+| Sampling | 1219.04 s. Steps 1–2 took 44–47 s/it; from step 13 on it held at ≈ 28.6 s/it |
+| VAE decode | 26.73 s |
+| Total (`generate_image`) | 1248.29 s |
+| Wall clock (timev) | 1248.78 s (≈ 21 min) |
+| Peak RSS (timev) | 479792 kB (see the UMA note above) |
+| Quality | Sharp photographic tabby cat; the sign reads `qwen2.1.cpp` correctly with no artifacts. Different composition from the cfg 6.0 image, as expected when guidance changes. |
+
+### Guidance comparison
+
+| `--cfg-scale` | Steady s/it | Total at 1024², 40 steps | vs P0-1 target (600 s) |
+|---|---|---|---|
+| 6.0 | ≈ 60.3 | 2704 s (45 min) | 4.5× over |
+| 1.0 | ≈ 28.6 | 1248 s (21 min) | 2.1× over |
+
+Guidance 1.0 halves the time with no visible quality loss, so it should be
+the sd.cpp adapter default (Story 02.2-002 currently says 6.0). It still
+misses the 10-minute target at 1024² by about 2×. Story 02.1-004 owns the
+decision: a smaller default size, fewer steps, or the XPS as a remote-only
+client.
+
+The two runs were not on identical memory conditions: the cfg 6.0 run shared
+the machine with the build agents and the driver's GPU cache, the cfg 1.0 run
+followed a reboot. The per-step ratio (2.1×) matches the doubled work, so
+guidance explains most of the gap.
+
+### Edit, 1024², 40 steps, `--cfg-scale 6.0`: failed at VAE decode
+
+```sh
+python3 docs/bench/timev.py ~/.cache/lig/spike/sdcpp/build/bin/sd-cli \
+  --diffusion-model $M/qwen_image_2.1-Q4_K.gguf \
+  --vae $M/qwen_image_2.1_vae_bf16.safetensors \
+  --llm $M/Qwen3VL-8B-Instruct-Q4_K_M.gguf \
+  --llm_vision $M/mmproj-Qwen3VL-8B-Instruct-F16.gguf \
+  -r out/t2i.png -p "change 'qwen2.1.cpp' to 'sd.cpp'" \
+  --steps 40 --seed 42 --cfg-scale 6.0 \
+  --sampling-method euler --offload-to-cpu --fa -v -o out/edit.png
+```
+
+| Metric | Value |
+|---|---|
+| Status | **FAIL**, no image. Sampling completed; VAE decode ran out of device memory |
+| Weights in memory | 10055.07 MB (the vision tower adds ≈ 1.1 GB to the text encoder) |
+| VAE encode of the reference | 9.72 s |
+| Sampling | 4031.26 s (≈ 96 s/it steady; step 1 took 168.6 s) |
+| VAE decode | Failed: needed 3551 MB of device memory, 3106 MB available; the automatic retry with spatial tiling also failed |
+| Wall clock (timev) | 4065.18 s (≈ 68 min), exit status 1 |
+| Peak RSS (timev) | 641356 kB |
+
+```
+[WARN ] model manager cannot make enough memory available on Vulkan0: need 3551.06 MB device / 3039.06 MB budget, available 3106.00 MB device
+[ERROR] vae decode compute failed
+[ERROR] decode_first_stage failed for latent 1
+```
+
+At the time, the `xe` driver held about 9.7 GB of freed GPU buffers
+(`GPUReclaim` in `/proc/meminfo`) cached from the earlier run, which the
+kernel does not count as available. The edit was not rerun after the reboot.
+A rerun at `--cfg-scale 1.0` on a clean boot should both fit and take roughly
+half the time; it is left for Epic-04's manual edit acceptance (Story
+04.2-001) rather than repeated here.
+
+### Not yet run
+
+- Second run with `--model-args qwen_image_2_1_prefix_cache=false`, to measure
+  the prefix-cache trade-off (technical note on the story).
 
 ## qwenimage-ncnn-vulkan (Story 02.1-002): rejected on this hardware
 
@@ -78,10 +240,9 @@ kernel does not count this cache as available and only releases it under
 heavy memory pressure. A brief 11 GB allocation released just 0.7 GB of it;
 the kernel moved other pages to zram swap first.
 
-The same squeeze hit sd.cpp: its edit run (Story 02.1-002's comparison
-partner, recorded under Story 02.1-001) finished sampling, then failed at VAE
-decode because only about 3.1 GB of device memory was available against the
-3.6 GB it needed.
+The same squeeze hit sd.cpp: its edit run (above) finished sampling, then
+failed at VAE decode because only about 3.1 GB of device memory was available
+against the 3.6 GB it needed.
 
 ### What would change the decision
 
@@ -100,9 +261,5 @@ ncnn drops out of the XPS default-engine decision. The decision is between
 stable-diffusion.cpp on Vulkan (Story 02.1-001) and the Intel-specific paths
 (Story 02.1-003).
 
-Note for that decision: the sd.cpp text-to-image run used `--cfg-scale 6.0`,
-as sd.cpp's Qwen-Image-2.1 docs suggest. Qwen-Image-2.1 is designed for
-guidance-free sampling at scale 1.0, which is ncnn's and mflux's default and
-what the reference article used. With guidance above 1.0 each step runs the
-model twice, so an sd.cpp run at `--cfg-scale 1.0` should be measured before
-concluding the XPS cannot reach the 10-minute target.
+The sd.cpp guidance 1.0 measurement above (21 min at 1024²) is the current
+baseline for that decision.
