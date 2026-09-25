@@ -130,8 +130,8 @@ built-in defaults. Model cache at `$XDG_CACHE_HOME/lig/models` (override
 
 Sampling defaults, all engines: 40 steps, seed random unless given, size
 1024×1024, output PNG. Engine-specific guidance defaults are owned by the adapter
-(sd.cpp docs recommend cfg 6.0 + Euler; mflux and the reference use guidance
-1.0). Sizes are validated to multiples of 32 before any engine is invoked.
+(guidance 1.0 everywhere, Euler for sd.cpp: Qwen-Image-2.1 is guidance-free, and on
+the XPS sd.cpp's documented cfg 6.0 doubled the time for no visible gain). Sizes are validated to multiples of 32 before any engine is invoked.
 
 ### P0 — Must have (Phase 1, XPS local)
 

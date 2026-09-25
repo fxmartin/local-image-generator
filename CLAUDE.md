@@ -116,8 +116,8 @@ only so the push mirror has somewhere to land.
 | `home-lab` (M1 Pro) | same as M3 Max | Always-on; secondary remote target. |
 
 Sampling defaults: 40 steps, 1024×1024, PNG, sizes validated to multiples of 32.
-Engine-specific guidance defaults live in the adapter (sd.cpp cfg 6.0 Euler;
-mflux guidance 1.0). Weights are never committed (`models/`, `*.gguf`,
+Engine-specific guidance defaults live in the adapter (guidance 1.0 for all engines,
+Euler for sd.cpp; cfg 6.0 doubled sd.cpp's time on the XPS). Weights are never committed (`models/`, `*.gguf`,
 `*.safetensors` are gitignored).
 
 ## Story Management Protocol
