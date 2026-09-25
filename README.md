@@ -133,6 +133,10 @@ compositions before a long render. Each PNG and sidecar carries the same `batch_
 already written are kept, the error names the seed, and the exit code is 1. `--count` outside 1-8
 exits 2.
 
+Unless `--no-sheet` is given, the run also writes `<batch_id>_sheet.png`: a near-square grid of
+the renders (2×2 for 4, 3×3 for up to 8), each tile downscaled to 512 px on its long edge and
+labelled with its seed. Its `.json` sidecar lists the member files and seeds.
+
 ## Diagnostics
 
 `lig doctor` prints platform facts (OS, arch, Vulkan ICD, Metal, oneAPI, RAM total/available,

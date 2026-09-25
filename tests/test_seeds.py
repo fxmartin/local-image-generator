@@ -20,7 +20,11 @@ def isolated(tmp_path, monkeypatch):
 
 
 def _sidecars(tmp_path):
-    return [json.loads(p.read_text()) for p in sorted((tmp_path / "outputs").glob("*.json"))]
+    return [
+        json.loads(p.read_text())
+        for p in sorted((tmp_path / "outputs").glob("*.json"))
+        if "_sheet" not in p.name
+    ]
 
 
 def test_consecutive_seeds_share_batch_id(tmp_path):
