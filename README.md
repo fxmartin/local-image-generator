@@ -40,7 +40,8 @@ uv run pytest      # coverage gate: 85 % on core, models, cli
 ```
 
 CI (`.gitlab-ci.yml`) runs the same three checks in an offline, root, Linux/arm64
-container with `uv sync --frozen --offline` from a pre-populated `UV_CACHE_DIR`.
+container with `uv sync --frozen` from the executor's project uv cache volume
+(re-warm it on home-lab after any `uv.lock` change; recipe in `.gitlab-ci.yml`).
 Tests therefore:
 
 - cannot open sockets (an autouse guard in `tests/conftest.py` raises; opt out with
