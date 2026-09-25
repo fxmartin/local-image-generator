@@ -77,7 +77,8 @@ and the command exits 1. `lig models rm NAME [--yes]` deletes the artifact and a
 default engine needs it. `lig models path NAME` prints the absolute path of an installed
 artifact; if it is not installed it prints nothing and exits 1.
 
-Keys: `engine`, `output_dir`, `models_dir`, `default_host`, `steps`, `size`, `serve.bind`.
+Keys: `engine`, `output_dir`, `models_dir`, `default_host`, `ncnn_binary`, `ncnn_model_dir`, `steps`, `size`, `serve.bind`.
+The `ncnn` engine needs `ncnn_binary` (or `qwenimage-ncnn-vulkan` on `PATH`) and `ncnn_model_dir` (the `qwenimage21/` folder); it prints no per-step progress, so expect a spinner with elapsed time.
 
 ## Diagnostics
 
