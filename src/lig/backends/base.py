@@ -1,6 +1,7 @@
 """Backend protocol and the error vocabulary every adapter shares."""
 
 from collections.abc import Callable
+from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from pydantic import BaseModel
@@ -14,9 +15,10 @@ STDERR_EXCERPT_CHARS = 2000
 
 
 class EngineError(Exception):
-    """An engine failed; `stderr` holds the tail of its output for diagnosis."""
+    """An engine failed; `stderr` holds the tail of its output, `log_path` the full log."""
 
-    def __init__(self, message: str, stderr: str = "") -> None:
+    def __init__(self, message: str, stderr: str = "", log_path: Path | None = None) -> None:
+        self.log_path = log_path
         self.stderr = stderr[-STDERR_EXCERPT_CHARS:]
         super().__init__(f"{message}\n{self.stderr}" if self.stderr else message)
 

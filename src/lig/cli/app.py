@@ -1,13 +1,18 @@
 """Typer entry point for the `lig` CLI. Subcommands are stubs until their stories land."""
 
+import functools
 import importlib.util
+from collections.abc import Callable
+from typing import Any
 
 import typer
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
+from lig.backends.base import EngineError
 from lig.core import config as cfg
+from lig.core.logs import report_engine_error
 
 from lig import __version__
 
@@ -24,13 +29,38 @@ def _version_callback(value: bool) -> None:
         raise typer.Exit()
 
 
+_debug = False  # set by the root callback; read by handle_engine_errors
+
+
 @app.callback()
 def main(
+    ctx: typer.Context,
     version: bool = typer.Option(
         False, "--version", callback=_version_callback, is_eager=True, help="Show version and exit."
     ),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Echo engine output."),
+    debug: bool = typer.Option(False, "--debug", help="Show Python tracebacks on failure."),
 ) -> None:
     """Generate images locally with Qwen-Image-2.1."""
+    global _debug
+    ctx.obj = {"verbose": verbose}
+    _debug = debug
+
+
+def handle_engine_errors(func: Callable[..., Any]) -> Callable[..., Any]:
+    """Turn an EngineError into a readable report and exit 1; `--debug` re-raises instead."""
+
+    @functools.wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        try:
+            return func(*args, **kwargs)
+        except EngineError as error:
+            if _debug:
+                raise
+            report_engine_error(error, error.log_path, Console(stderr=True))
+            raise typer.Exit(1) from error
+
+    return wrapper
 
 
 def _stub(name: str) -> None:
@@ -38,36 +68,42 @@ def _stub(name: str) -> None:
 
 
 @app.command()
+@handle_engine_errors
 def generate() -> None:
     """Generate an image from a text prompt."""
     _stub("generate")
 
 
 @app.command()
+@handle_engine_errors
 def edit() -> None:
     """Edit an existing image with a prompt."""
     _stub("edit")
 
 
 @app.command()
+@handle_engine_errors
 def seeds() -> None:
     """Explore seeds for a prompt."""
     _stub("seeds")
 
 
 @app.command()
+@handle_engine_errors
 def bench() -> None:
     """Benchmark the configured engine on this host."""
     _stub("bench")
 
 
 @app.command()
+@handle_engine_errors
 def models() -> None:
     """Download, verify and switch model weights."""
     _stub("models")
 
 
 @app.command()
+@handle_engine_errors
 def doctor() -> None:
     """Diagnose the local setup."""
     _stub("doctor")
@@ -108,6 +144,7 @@ def config_init() -> None:
 
 
 @app.command()
+@handle_engine_errors
 def serve() -> None:
     """Serve a local backend to other hosts (needs the serve extra)."""
     if any(importlib.util.find_spec(mod) is None for mod in ("fastapi", "uvicorn")):
