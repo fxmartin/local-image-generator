@@ -206,6 +206,106 @@ def models_pull(
         raise typer.Exit(1) from exc
 
 
+def _load_cache() -> tuple[Any, Path, cfg.Settings]:
+    try:
+        settings = cfg.load_settings().settings
+        return load_registry(), cache.ensure_models_dir(settings.models_dir), settings
+    except (cfg.ConfigError, RegistryError, OSError) as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+
+
+def _lookup(registry: Any, name: str) -> Any:
+    try:
+        return registry.get(name)
+    except RegistryError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+
+
+@models_app.command("verify")
+def models_verify(
+    name: str | None = typer.Argument(None, help="Artifact to check; default: all installed."),
+) -> None:
+    """Re-hash installed artifacts; exit 1 on any sha256 mismatch."""
+    registry, models_dir, _ = _load_cache()
+    artifacts = [_lookup(registry, name)] if name else registry.artifacts
+    failed = False
+    err = Console(stderr=True, soft_wrap=True)
+    progress = Progress(
+        TextColumn("{task.description}"), BarColumn(), DownloadColumn(), console=err
+    )
+    with progress:
+        for artifact in artifacts:
+            if not (models_dir / artifact.filename).is_file():
+                progress.console.print(f"{artifact.name}: not installed")
+                continue
+            task = progress.add_task(artifact.name, total=artifact.size_bytes)
+            try:
+                actual = cache.verify_artifact(
+                    models_dir,
+                    artifact,
+                    lambda done, task=task: progress.update(task, completed=done),
+                )
+            except OSError as exc:
+                progress.console.print(f"{artifact.name}: error: {exc}")
+                failed = True
+                continue
+            if actual is None:
+                progress.console.print(f"{artifact.name}: ok")
+            else:
+                failed = True
+                progress.console.print(
+                    f"{artifact.name}: mismatch: expected {artifact.sha256.lower()}, got {actual}"
+                )
+    if failed:
+        raise typer.Exit(1)
+
+
+@models_app.command("rm")
+def models_rm(
+    name: str = typer.Argument(..., help="Artifact to delete."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip the confirmation prompt."),
+) -> None:
+    """Delete an artifact (and any partial download) from the cache."""
+    registry, models_dir, settings = _load_cache()
+    artifact = _lookup(registry, name)
+    files = cache.artifact_files(models_dir, artifact)
+    if not files:
+        typer.echo(f"error: {name} is not in the cache", err=True)
+        raise typer.Exit(1)
+    size = cache.human_size(sum(f.stat().st_size for f in files))
+    try:
+        needed_by = registry.set_for(settings.engine, sys.platform)
+    except RegistryError:
+        needed_by = []  # "auto", "remote" or an engine without a set here
+    if artifact in needed_by:
+        typer.echo(
+            f"warning: {name} is needed by the default engine '{settings.engine}'; "
+            "it becomes unavailable after removal"
+        )
+    if not yes and not typer.confirm(f"Delete {name} ({size})?"):
+        raise typer.Exit(1)
+    try:
+        for path in files:
+            path.unlink()
+    except OSError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    typer.echo(f"removed {name} ({size})")
+
+
+@models_app.command("path")
+def models_path(name: str = typer.Argument(..., help="Artifact name.")) -> None:
+    """Print an installed artifact's absolute path; exit 1 (silently) if it is not installed."""
+    registry, models_dir, _ = _load_cache()
+    artifact = _lookup(registry, name)
+    target = models_dir / artifact.filename
+    if not target.is_file() or (models_dir / f"{artifact.filename}.part").exists():
+        raise typer.Exit(1)
+    typer.echo(str(target.resolve()))
+
+
 def _platform_info(models_dir: Path) -> diag.PlatformInfo:
     return diag.collect_platform_info(models_dir)
 
