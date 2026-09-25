@@ -2,8 +2,9 @@
 """Stub `sd-cli`: echo argv, print fake progress, write a tiny PNG to `-o`.
 
 Env: STUB_ARGV_FILE (append argv as a JSON line), STUB_FAIL=1 (stderr + exit 2),
-STUB_SLEEP=<seconds> (delay before doing work). Self-contained: copied alone to a
-temp dir under the real binary name, so it must not import sibling modules.
+STUB_SLEEP=<seconds> (delay before doing work), STUB_VERSION=<banner> for `--version`.
+Self-contained: copied alone to a temp dir under the real binary name, so it must not
+import sibling modules.
 """
 
 import json
@@ -13,6 +14,14 @@ import time
 
 
 def main(argv: list[str]) -> int:
+    if argv == ["--version"]:
+        print(
+            os.environ.get(
+                "STUB_VERSION", "stable-diffusion.cpp version master-abc1234, commit abc1234"
+            )
+        )
+        return 0
+
     argv_file = os.environ.get("STUB_ARGV_FILE")
     if argv_file:
         with open(argv_file, "a") as fh:

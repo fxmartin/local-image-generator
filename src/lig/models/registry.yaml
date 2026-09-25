@@ -32,6 +32,15 @@ artifacts:
     role: vae
     license: apache-2.0
     url: https://huggingface.co/Qwen/Qwen-Image-2.1-GGUF/resolve/main/qwen-image-2.1-vae.safetensors
+  - name: qwen-image-2.1-mmproj
+    repo: Qwen/Qwen-Image-2.1-GGUF
+    filename: qwen2.5-vl-7b-mmproj-f16.gguf
+    sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+    size_bytes: 1
+    engines: [sdcpp]
+    role: mmproj
+    license: apache-2.0
+    url: https://huggingface.co/Qwen/Qwen-Image-2.1-GGUF/resolve/main/qwen2.5-vl-7b-mmproj-f16.gguf
 
 sets:
   sdcpp-q4:
@@ -40,3 +49,4 @@ sets:
       - qwen-image-2.1-q4-transformer
       - qwen-image-2.1-text-encoder
       - qwen-image-2.1-vae
+      - qwen-image-2.1-mmproj

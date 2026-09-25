@@ -2,6 +2,7 @@
 
 import os
 import re
+import shlex
 import tomllib
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -24,6 +25,20 @@ class ServeSettings(BaseModel):
     bind: str = "127.0.0.1:8765"
 
 
+class SdcppSettings(BaseModel):
+    # Appended verbatim to the sd-cli argv; an env var is split shell-style.
+    extra_args: list[str] = []
+
+    @field_validator("extra_args", mode="before")
+    @classmethod
+    def _split_string(cls, value: Any) -> Any:
+        return shlex.split(value) if isinstance(value, str) else value
+
+
+class EnginesSettings(BaseModel):
+    sdcpp: SdcppSettings = SdcppSettings()
+
+
 class Settings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -34,6 +49,7 @@ class Settings(BaseModel):
     steps: int = 40
     size: str = "1024x1024"
     serve: ServeSettings = ServeSettings()
+    engines: EnginesSettings = EnginesSettings()
 
     @field_validator("size")
     @classmethod
@@ -195,6 +211,10 @@ CONFIG_TEMPLATE = """\
 
 # Remote `lig serve` host on the tailnet, used by the remote engine.
 # default_host = "macbook-pro-m3-max.tailac3c7a.ts.net:8765"
+
+# Extra sd-cli arguments for the sdcpp engine, appended verbatim
+# (env: LIG_ENGINES__SDCPP__EXTRA_ARGS, split shell-style).
+# engines.sdcpp.extra_args = ["--model-args", "qwen_image_2_1_prefix_cache=false"]
 
 # Sampling steps.
 # steps = 40
