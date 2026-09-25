@@ -3,6 +3,7 @@
 import typer
 from rich.console import Console
 from rich.table import Table
+from rich.text import Text
 
 from lig.core import config as cfg
 
@@ -70,7 +71,7 @@ def config_show() -> None:
     exists = "" if resolved.path.is_file() else " (not found)"
     table = Table("key", "value", "source", box=None, pad_edge=False)
     for key, value, source in cfg.effective_values(resolved):
-        table.add_row(key, str(value), source)
+        table.add_row(key, Text(str(value)), source)
     Console(soft_wrap=True).print(table)
     typer.echo(f"config file: {resolved.path}{exists}")
 

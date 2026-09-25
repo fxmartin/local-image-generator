@@ -43,6 +43,11 @@ class Settings(BaseModel):
             raise ValueError(f"must be WIDTHxHEIGHT, both multiples of {SIZE_MULTIPLE}")
         return value
 
+    @field_validator("output_dir", "models_dir")
+    @classmethod
+    def _expand_user(cls, value: Path) -> Path:
+        return value.expanduser()
+
 
 @dataclass
 class ResolvedConfig:
@@ -96,7 +101,10 @@ def _key_lines(text: str) -> dict[str, int]:
 def _read_file(path: Path) -> tuple[dict[str, Any], list[str]]:
     if not path.is_file():
         return {}, []
-    text = path.read_text()
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise ConfigError(f"{path}: cannot read: {exc}") from exc
     try:
         flat = _flatten(tomllib.loads(text))
     except tomllib.TOMLDecodeError as exc:

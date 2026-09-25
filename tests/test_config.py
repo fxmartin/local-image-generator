@@ -141,3 +141,33 @@ def test_config_init_writes_then_refuses(cfg_path):
 
 def test_settings_paths_are_paths():
     assert isinstance(cfg.Settings().output_dir, Path)
+
+
+def test_path_settings_expand_user(tmp_path):
+    path = tmp_path / "c.toml"
+    path.write_text('models_dir = "~/m"\n')
+    res = cfg.load_settings(env={"LIG_OUTPUT_DIR": "~/o"}, path=path)
+    assert res.settings.models_dir == Path.home() / "m"
+    assert res.settings.output_dir == Path.home() / "o"
+
+
+def test_non_utf8_file_raises_config_error(tmp_path):
+    path = tmp_path / "c.toml"
+    path.write_bytes(b"\xff\xfe")
+    with pytest.raises(cfg.ConfigError, match=str(path)):
+        cfg.load_settings(env={}, path=path)
+
+
+def test_config_show_non_utf8_file_exits_nonzero(cfg_path):
+    cfg_path.parent.mkdir()
+    cfg_path.write_bytes(b"\xff\xfe")
+    result = runner.invoke(app, ["config", "show"])
+    assert result.exit_code == 1
+    assert "error:" in result.output
+
+
+def test_config_show_prints_brackets_literally(cfg_path, monkeypatch):
+    monkeypatch.setenv("LIG_DEFAULT_HOST", "[bold]host")
+    result = runner.invoke(app, ["config", "show"])
+    assert result.exit_code == 0
+    assert "[bold]host" in result.output
