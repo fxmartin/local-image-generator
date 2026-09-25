@@ -59,6 +59,14 @@ override with `LIG_MODELS_DIR` or `models_dir`. The directory is created on firs
 license and status (`installed`, `missing`, `partial` = a `.part` file exists, `unverified` =
 present without a `.sha256.ok` marker), plus total cache size and free disk.
 
+`lig models pull [NAME | --engine E] [--force]` downloads weights into the cache. It prints the
+total bytes to fetch and the free disk first, and refuses if free disk is under total + 2 GB
+(`--force` overrides). Interrupted downloads resume from the `.part` file with an HTTP `Range`
+request (a server that ignores it triggers a warning and a restart from zero). The sha256 is
+checked on completion: a mismatch renames the file `.corrupt`, prints expected and actual
+hashes, exits 1 and writes no marker. Verified artifacts are skipped as `already installed`;
+`--force` re-downloads them.
+
 Keys: `engine`, `output_dir`, `models_dir`, `default_host`, `steps`, `size`, `serve.bind`.
 
 ## Diagnostics

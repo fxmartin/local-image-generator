@@ -3,12 +3,15 @@
 import functools
 import importlib.util
 import json
+import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 import typer
+import httpx
 from rich.console import Console
+from rich.progress import BarColumn, DownloadColumn, Progress, TextColumn, TransferSpeedColumn
 from rich.table import Table
 from rich.text import Text
 
@@ -20,7 +23,7 @@ from lig.core.logs import report_engine_error
 
 from lig import __version__
 from lig.core import config as cfg
-from lig.models import cache
+from lig.models import cache, downloader
 from lig.models.registry import RegistryError, load_registry
 
 app = typer.Typer(
@@ -102,7 +105,7 @@ def bench() -> None:
     _stub("bench")
 
 
-models_app = typer.Typer(help="Inspect the model weight cache.", no_args_is_help=True)
+models_app = typer.Typer(help="Inspect and download model weights.", no_args_is_help=True)
 app.add_typer(models_app, name="models")
 
 
@@ -139,6 +142,70 @@ def models_list(
         f"cache: {cache.human_size(report['cache_bytes'])} used in {report['models_dir']}, "
         f"{cache.human_size(report['free_bytes'])} free"
     )
+
+
+@models_app.command("pull")
+def models_pull(
+    name: str | None = typer.Argument(None, help="Artifact name to download."),
+    engine: str | None = typer.Option(None, "--engine", help="Download this engine's full set."),
+    force: bool = typer.Option(
+        False, "--force", help="Re-download verified files and skip the free-disk check."
+    ),
+) -> None:
+    """Download weights with resume, progress and sha256 verification."""
+    if (name is None) == (engine is None):
+        typer.echo("error: give exactly one of NAME or --engine", err=True)
+        raise typer.Exit(2)
+    err = Console(stderr=True, soft_wrap=True)
+    try:
+        registry = load_registry()
+        artifacts = registry.set_for(engine, sys.platform) if engine else [registry.get(name)]
+        models_dir = cache.ensure_models_dir(cfg.load_settings().settings.models_dir)
+    except (cfg.ConfigError, RegistryError, OSError) as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+
+    total = downloader.remaining_bytes(models_dir, artifacts, force)
+    free = downloader.free_bytes(models_dir)
+    typer.echo(f"to download: {cache.human_size(total)}, free disk: {cache.human_size(free)}")
+    if not force and free < total + downloader.DISK_MARGIN_BYTES:
+        typer.echo(
+            f"error: not enough disk: need {cache.human_size(total)} plus "
+            f"{cache.human_size(downloader.DISK_MARGIN_BYTES)} headroom; use --force to override",
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    progress = Progress(
+        TextColumn("{task.description}"),
+        BarColumn(),
+        DownloadColumn(),
+        TransferSpeedColumn(),
+        console=err,
+    )
+    try:
+        with httpx.Client(timeout=httpx.Timeout(30.0, read=60.0)) as client, progress:
+            for artifact in artifacts:
+                task = progress.add_task(artifact.name, total=artifact.size_bytes)
+
+                def update(done: int, _total: int, task=task) -> None:
+                    progress.update(task, completed=done)
+
+                outcome = downloader.pull_artifact(
+                    artifact, models_dir, client, force=force, on_progress=update
+                )
+                for warning in outcome.warnings:
+                    progress.console.print(f"warning: {warning}")
+                if outcome.skipped:
+                    progress.console.print(f"{artifact.name}: already installed")
+                else:
+                    progress.update(task, completed=artifact.size_bytes)
+    except downloader.ChecksumMismatch as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    except (downloader.DownloadError, OSError) as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1) from exc
 
 
 def _platform_info(models_dir: Path) -> diag.PlatformInfo:
