@@ -33,7 +33,7 @@ Without the `serve` extra, `lig serve` exits with a one-line hint to install it.
 
 ```
 uv sync            # install runtime + dev dependencies
-uv run lig --help  # list subcommands (`edit`, `seeds`, `bench` are still stubs)
+uv run lig --help  # list subcommands (`seeds`, `bench` are still stubs)
 uv run ruff check .
 uv run pytest      # coverage gate: 85 % on core, models, cli
 ```
@@ -86,6 +86,14 @@ only), not Apache-2.0. The 2.1 VAE is not interchangeable with earlier Qwen-Imag
 
 Keys: `engine`, `output_dir`, `models_dir`, `default_host`, `ncnn_binary`, `ncnn_model_dir`, `steps`, `size`, `serve.bind`.
 The `ncnn` engine needs `ncnn_binary` (or `qwenimage-ncnn-vulkan` on `PATH`) and `ncnn_model_dir` (the `qwenimage21/` folder); it prints no per-step progress, so expect a spinner with elapsed time.
+
+## Editing
+
+`lig edit IMAGE PROMPT [--size WxH] [--steps N] [--seed S] [--engine E] [--strength 0..1] [--out DIR] [--force]`
+applies an instruction edit ("make the teapot blue") to an existing image and writes a new PNG plus
+sidecar; the sidecar records the source's `source_path` and `source_sha256`. With no `--size`, the
+output is the source size rounded down to multiples of 32, and the command says so. Exit 4 if the
+engine cannot edit (e.g. the sdcpp `mmproj` weight is missing), 2 if IMAGE is not a readable image.
 
 ## Generating
 
