@@ -29,11 +29,23 @@ lig --version
 
 Without the `serve` extra, `lig serve` exits with a one-line hint to install it.
 
+## Benchmarking
+
+```
+lig bench [--engines sdcpp,ncnn] [--size 768x768] [--steps 30] [--runs 3]
+lig bench compare bench/A.json bench/B.json   # same host only; prints a delta table
+lig bench render bench/<date>_<host>.json     # Markdown table for docs/bench/
+```
+
+`lig bench` runs a fixed prompt and seed on each engine, prints load s, s/step, total s,
+peak RSS and the image hash, and writes `bench/<date>_<host>.json` (all runs kept, median
+reported). Unavailable engines are listed as skipped with the reason.
+
 ## Development
 
 ```
 uv sync            # install runtime + dev dependencies
-uv run lig --help  # list subcommands (`edit`, `bench` are still stubs)
+uv run lig --help  # list subcommands (`seeds` is still a stub)
 uv run ruff check .
 uv run pytest      # coverage gate: 85 % on core, models, cli
 ```
