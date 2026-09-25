@@ -123,3 +123,33 @@ def test_ctrl_c_terminates_and_removes_partial_output(tmp_path, log):
 def test_missing_binary_raises_engine_error(tmp_path, log):
     with pytest.raises(EngineError):
         run_engine([str(tmp_path / "nope")], log=log, on_progress=None)
+
+
+def test_callback_abort_with_sigterm_ignoring_child_still_cancels(tmp_path, log):
+    def interrupt(step: int, total: int) -> None:
+        raise KeyboardInterrupt
+
+    argv = make_stub(
+        tmp_path,
+        """
+        import signal, time
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        print("step 1/2", flush=True)
+        time.sleep(60)
+        """,
+    )
+    with pytest.raises(KeyboardInterrupt):
+        run_engine(argv, log=log, on_progress=interrupt, grace=0.5)
+
+
+def test_unkillable_child_does_not_hang_the_reaper(monkeypatch):
+    from lig.backends import runner
+
+    class StuckProc:
+        pid = 0
+
+        def wait(self, timeout=None):
+            raise runner.subprocess.TimeoutExpired("stuck", timeout)
+
+    monkeypatch.setattr(runner, "_signal_group", lambda proc, sig: None)
+    runner._terminate_group(StuckProc(), grace=0.01)  # type: ignore[arg-type]
