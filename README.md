@@ -33,7 +33,7 @@ Without the `serve` extra, `lig serve` exits with a one-line hint to install it.
 
 ```
 uv sync            # install runtime + dev dependencies
-uv run lig --help  # list subcommands (all stubs for now)
+uv run lig --help  # list subcommands (`edit`, `seeds`, `bench` are still stubs)
 uv run ruff check .
 uv run pytest      # coverage gate: 85 % on core, models, cli
 ```
@@ -86,6 +86,18 @@ only), not Apache-2.0. The 2.1 VAE is not interchangeable with earlier Qwen-Imag
 
 Keys: `engine`, `output_dir`, `models_dir`, `default_host`, `ncnn_binary`, `ncnn_model_dir`, `steps`, `size`, `serve.bind`.
 The `ncnn` engine needs `ncnn_binary` (or `qwenimage-ncnn-vulkan` on `PATH`) and `ncnn_model_dir` (the `qwenimage21/` folder); it prints no per-step progress, so expect a spinner with elapsed time.
+
+## Generating
+
+`lig generate PROMPT [--size WxH] [--steps N] [--seed S] [--engine E] [--out DIR] [--negative TEXT] [--guidance G] [--force]`
+writes a PNG and a JSON sidecar to `./outputs` (or `--out` / `output_dir`) and prints the PNG path
+as its last line. Flags override `LIG_*` env, which overrides `config.toml`. On Linux, with no
+`--size`/`--steps` flag or config value, it uses 768x768 and 30 steps (the XPS local fallback).
+`--engine fake` renders a seeded gradient without weights.
+
+Exit codes: 0 ok, 1 engine error, 2 usage (bad size, unknown engine, invalid config), 3 memory
+pre-flight refusal (`--force` overrides), 4 engine unavailable (the message carries the reason;
+run `lig doctor`). A negative prompt does nothing at guidance 1, so `lig` warns and suggests `--guidance`.
 
 ## Diagnostics
 
