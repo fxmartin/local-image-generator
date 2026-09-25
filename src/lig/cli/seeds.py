@@ -14,6 +14,7 @@ from lig.core import config as cfg
 from lig.core import run
 from lig.core.models import SEED_BITS
 from lig.core.output import write_result
+from lig.core.sheet import build_sheet
 from lig.models.registry import RegistryError, load_registry
 
 MAX_COUNT = 8
@@ -32,6 +33,7 @@ def seeds(
     out: Path | None = typer.Option(None, "--out", help="Output directory."),  # noqa: B008
     negative: str | None = typer.Option(None, "--negative", help="Negative prompt."),
     guidance: float | None = typer.Option(None, "--guidance", help="Guidance scale."),
+    no_sheet: bool = typer.Option(False, "--no-sheet", help="Skip the contact sheet."),
     force: bool = typer.Option(False, "--force", help="Run even if memory looks too tight."),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Print only the output paths."),
 ) -> None:
@@ -87,7 +89,9 @@ def seeds(
 
     if random_start and not quiet:
         typer.echo(f"seed start: {seed_start}")
-    writer = partial(write_result, batch_id=uuid.uuid4().hex)
+    batch_id = uuid.uuid4().hex
+    writer = partial(write_result, batch_id=batch_id)
+    members: list[tuple[Path, int]] = []
     indeterminate = bool(getattr(backend, "progress_indeterminate", False))
     for done, request in enumerate(requests):
         try:
@@ -98,4 +102,7 @@ def seeds(
                 f"error: seed {request.seed} failed; kept {done} of {count} images", err=True
             )
             raise
+        members.append((path, request.seed))
         typer.echo(str(path))
+    if not no_sheet:
+        typer.echo(str(build_sheet(members, settings.output_dir, batch_id)))
