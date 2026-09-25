@@ -19,6 +19,9 @@ from lig.core import doctor as diag
 from lig.core.logs import report_engine_error
 
 from lig import __version__
+from lig.core import config as cfg
+from lig.models import cache
+from lig.models.registry import RegistryError, load_registry
 
 app = typer.Typer(
     name="lig",
@@ -99,11 +102,43 @@ def bench() -> None:
     _stub("bench")
 
 
-@app.command()
-@handle_engine_errors
-def models() -> None:
-    """Download, verify and switch model weights."""
-    _stub("models")
+models_app = typer.Typer(help="Inspect the model weight cache.", no_args_is_help=True)
+app.add_typer(models_app, name="models")
+
+
+@models_app.command("list")
+def models_list(
+    engine: str | None = typer.Option(None, "--engine", help="Only show this engine's artifacts."),
+    as_json: bool = typer.Option(False, "--json", help="Emit JSON instead of a table."),
+) -> None:
+    """Show each artifact's state, size and license, plus cache size and free disk."""
+    try:
+        resolved = cfg.load_settings()
+        report = cache.build_report(
+            load_registry(), cache.ensure_models_dir(resolved.settings.models_dir), engine
+        )
+    except (cfg.ConfigError, RegistryError, OSError) as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    if as_json:
+        typer.echo(json.dumps(report, indent=2))
+        return
+    table = Table("name", "role", "engines", "size", "license", "status", box=None, pad_edge=False)
+    for row in report["artifacts"]:
+        table.add_row(
+            row["name"],
+            row["role"],
+            ",".join(row["engines"]),
+            cache.human_size(row["size_bytes"]),
+            row["license"],
+            row["status"],
+        )
+    console = Console(soft_wrap=True)
+    console.print(table)
+    console.print(
+        f"cache: {cache.human_size(report['cache_bytes'])} used in {report['models_dir']}, "
+        f"{cache.human_size(report['free_bytes'])} free"
+    )
 
 
 def _platform_info(models_dir: Path) -> diag.PlatformInfo:
