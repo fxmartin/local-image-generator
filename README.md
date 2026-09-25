@@ -18,6 +18,17 @@ Pre-alpha. Phase 0 (engine benchmark on the Dell XPS 13) has not started. See:
 
 Installation and usage docs land with story 05.1-001.
 
+## Install
+
+```
+uv tool install .                # from a checkout; puts `lig` on PATH
+uv tool install ".[serve]"       # adds FastAPI/uvicorn for `lig serve`
+uv tool install ".[mlx]"         # adds mflux (Apple Silicon only)
+lig --version
+```
+
+Without the `serve` extra, `lig serve` exits with a one-line hint to install it.
+
 ## Development
 
 ```

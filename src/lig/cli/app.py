@@ -1,5 +1,7 @@
 """Typer entry point for the `lig` CLI. Subcommands are stubs until their stories land."""
 
+import importlib.util
+
 import typer
 from rich.console import Console
 from rich.table import Table
@@ -7,11 +9,28 @@ from rich.text import Text
 
 from lig.core import config as cfg
 
+from lig import __version__
+
 app = typer.Typer(
     name="lig",
     help="Generate images locally with Qwen-Image-2.1.",
     no_args_is_help=True,
 )
+
+
+def _version_callback(value: bool) -> None:
+    if value:
+        typer.echo(f"lig {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: bool = typer.Option(
+        False, "--version", callback=_version_callback, is_eager=True, help="Show version and exit."
+    ),
+) -> None:
+    """Generate images locally with Qwen-Image-2.1."""
 
 
 def _stub(name: str) -> None:
@@ -91,4 +110,10 @@ def config_init() -> None:
 @app.command()
 def serve() -> None:
     """Serve a local backend to other hosts (needs the serve extra)."""
+    if any(importlib.util.find_spec(mod) is None for mod in ("fastapi", "uvicorn")):
+        typer.echo(
+            "lig serve needs the 'serve' extra: uv tool install 'local-image-generator[serve]'",
+            err=True,
+        )
+        raise typer.Exit(1)
     _stub("serve")
