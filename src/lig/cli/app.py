@@ -2,7 +2,9 @@
 
 import functools
 import importlib.util
+import json
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import typer
@@ -10,8 +12,10 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from lig.backends.base import EngineError
+from lig.backends.base import Backend, EngineError
+from lig.backends.registry import BACKENDS
 from lig.core import config as cfg
+from lig.core import doctor as diag
 from lig.core.logs import report_engine_error
 
 from lig import __version__
@@ -102,11 +106,60 @@ def models() -> None:
     _stub("models")
 
 
+def _platform_info(models_dir: Path) -> diag.PlatformInfo:
+    return diag.collect_platform_info(models_dir)
+
+
+def _engine_factories() -> dict[str, Callable[[], Backend]]:
+    return {name: cls for name, cls in BACKENDS.items()}
+
+
+def _fmt_bytes(value: int | None) -> str:
+    return "unknown" if value is None else f"{value / 1024**3:.1f} GiB"
+
+
+def _yes_no(value: bool) -> str:
+    return "yes" if value else "no"
+
+
 @app.command()
 @handle_engine_errors
-def doctor() -> None:
-    """Diagnose the local setup."""
-    _stub("doctor")
+def doctor(
+    as_json: bool = typer.Option(False, "--json", help="Emit the report as JSON."),
+) -> None:
+    """Diagnose the local setup: platform facts and per-engine availability."""
+    try:
+        resolved = cfg.load_settings()
+    except cfg.ConfigError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    report = diag.build_report(_platform_info(resolved.settings.models_dir), _engine_factories())
+    if as_json:
+        typer.echo(json.dumps(report, indent=2))
+        return
+    plat = report["platform"]
+    facts = Table("platform", "value", box=None, pad_edge=False)
+    for label, value in [
+        ("os", plat["os"]),
+        ("arch", plat["arch"]),
+        ("Vulkan ICD", _yes_no(plat["vulkan_icd"])),
+        ("Metal", _yes_no(plat["metal"])),
+        ("oneAPI", _yes_no(plat["oneapi"])),
+        ("RAM total", _fmt_bytes(plat["ram_total"])),
+        ("RAM available", _fmt_bytes(plat["ram_available"])),
+        ("models dir", plat["models_dir"]),
+        ("disk free", _fmt_bytes(plat["disk_free"])),
+    ]:
+        facts.add_row(label, Text(str(value)))
+    engines = Table("engine", "cached weights", "status", box=None, pad_edge=False)
+    for row in report["engines"]:
+        status = row["status"] + (f": {row['reason']}" if row["reason"] else "")
+        cached = f"{row['cached_files']} file(s), {_fmt_bytes(row['cached_bytes'])}"
+        engines.add_row(row["engine"], cached, Text(status))
+    console = Console(soft_wrap=True)
+    console.print(facts)
+    console.print()
+    console.print(engines)
 
 
 config_app = typer.Typer(help="Show or initialise configuration.", no_args_is_help=True)

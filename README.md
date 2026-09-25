@@ -53,3 +53,10 @@ env vars, e.g. `LIG_SERVE__BIND`.
 - `output_dir` and `models_dir` expand a leading `~` to your home directory.
 
 Keys: `engine`, `output_dir`, `models_dir`, `default_host`, `steps`, `size`, `serve.bind`.
+
+## Diagnostics
+
+`lig doctor` prints platform facts (OS, arch, Vulkan ICD, Metal, oneAPI, RAM total/available,
+models dir, disk free) and a table of every known engine with `available` or
+`unavailable: <reason>` plus the weights cached for it. `lig doctor --json` emits the same data
+for scripting.
