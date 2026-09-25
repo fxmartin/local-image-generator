@@ -20,6 +20,7 @@ from lig.backends.base import Backend, EngineError
 from lig.backends.registry import BACKENDS
 from lig.cli.edit import edit as edit_command
 from lig.cli.generate import generate as generate_command
+from lig.cli.seeds import seeds as seeds_command
 from lig.core import config as cfg
 from lig.core import doctor as diag
 from lig.core import memory
@@ -90,16 +91,10 @@ def _stub(name: str) -> None:
 
 
 app.command("generate")(handle_engine_errors(generate_command))
+app.command("seeds")(handle_engine_errors(seeds_command))
 
 
 app.command("edit")(handle_engine_errors(edit_command))
-
-
-@app.command()
-@handle_engine_errors
-def seeds() -> None:
-    """Explore seeds for a prompt."""
-    _stub("seeds")
 
 
 @app.command()
