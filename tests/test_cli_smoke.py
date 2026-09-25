@@ -17,7 +17,9 @@ def test_help_lists_all_subcommands():
 
 # serve is covered by test_packaging (behaviour depends on the optional extra)
 STUBS = [
-    n for n in SUBCOMMANDS if n not in ("generate", "seeds", "config", "models", "doctor", "serve")
+    n
+    for n in SUBCOMMANDS
+    if n not in ("generate", "edit", "config", "models", "doctor", "serve", "bench")
 ]
 
 

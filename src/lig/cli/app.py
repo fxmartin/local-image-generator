@@ -18,9 +18,9 @@ from rich.text import Text
 from lig import __version__
 from lig.backends.base import Backend, EngineError
 from lig.backends.registry import BACKENDS
+from lig.cli.bench import bench_app
 from lig.cli.edit import edit as edit_command
 from lig.cli.generate import generate as generate_command
-from lig.cli.seeds import seeds as seeds_command
 from lig.core import config as cfg
 from lig.core import doctor as diag
 from lig.core import memory
@@ -91,7 +91,6 @@ def _stub(name: str) -> None:
 
 
 app.command("generate")(handle_engine_errors(generate_command))
-app.command("seeds")(handle_engine_errors(seeds_command))
 
 
 app.command("edit")(handle_engine_errors(edit_command))
@@ -99,9 +98,12 @@ app.command("edit")(handle_engine_errors(edit_command))
 
 @app.command()
 @handle_engine_errors
-def bench() -> None:
-    """Benchmark the configured engine on this host."""
-    _stub("bench")
+def seeds() -> None:
+    """Explore seeds for a prompt."""
+    _stub("seeds")
+
+
+app.add_typer(bench_app, name="bench")
 
 
 models_app = typer.Typer(help="Inspect and download model weights.", no_args_is_help=True)
