@@ -29,6 +29,8 @@ variables:
   UV_OFFLINE: "1"
   UV_PYTHON_DOWNLOADS: never
   UV_LINK_MODE: copy
+  # commit-format needs the MR's base commit, not a shallow clone.
+  GIT_DEPTH: "0"
 
 stages:
   - test
@@ -42,3 +44,24 @@ test:
     - uv run ruff format --check .
     # Coverage gate (fail_under = 85) lives in pyproject.toml; pytest exits non-zero below it.
     - uv run pytest --cov
+
+# Conventional commits. Node is not in the offline image, so this is the Python-only
+# equivalent of .commitlintrc.json (scripts/commit_lint.py). Only the MR's own commits are
+# checked; history already on main is exempt.
+commit-format:
+  stage: test
+  image: 127.0.0.1:5001/local/uv-git@sha256:72794e132d0316ef8c8b3a76ec4c0ec828eb56329f945bd0f7b63d6c8dbaf17f
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  script:
+    - uv run --no-project python scripts/commit_lint.py "$CI_MERGE_REQUEST_DIFF_BASE_SHA..HEAD"
+
+# Tag pipelines are not enabled by the workflow rules above; run by hand before tagging:
+# python scripts/release_check.py vX.Y.Z. In MRs it checks uv.lock agrees with pyproject.toml.
+release-check:
+  stage: test
+  image: 127.0.0.1:5001/local/uv-git@sha256:72794e132d0316ef8c8b3a76ec4c0ec828eb56329f945bd0f7b63d6c8dbaf17f
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  script:
+    - uv run --no-project python scripts/release_check.py "v$(uv run --no-project python -c 'import tomllib;print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')"
