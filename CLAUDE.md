@@ -111,7 +111,7 @@ only so the push mirror has somewhere to land.
 
 | Host | Engine (planned default) | Notes |
 |---|---|---|
-| `omarchy-xps13` (Arc 140V iGPU, 30 GB) | sd.cpp Vulkan or ncnn-vulkan, decided by Phase 0 bench | Vulkan ICD present; no oneAPI/Level Zero installed. |
+| `omarchy-xps13` (Arc 140V iGPU, 30 GB) | sd.cpp Vulkan (ncnn, SYCL, torch XPU rejected in Phase 0) | Vulkan works (sd.cpp, the only working engine). oneAPI + Level Zero installed, but SYCL is rejected: the driver under-reports free memory. |
 | `macbook-pro-m3-max` | sd.cpp Metal (Phase 2) → mflux MLX `-q 8` (Phase 3) | Serves the XPS via `lig serve` over the tailnet. |
 | `home-lab` (M1 Pro) | same as M3 Max | Always-on; secondary remote target. |
 
