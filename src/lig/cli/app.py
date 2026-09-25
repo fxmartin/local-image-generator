@@ -5,6 +5,7 @@ import importlib.util
 import json
 import sys
 from collections.abc import Callable
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -21,9 +22,10 @@ from lig.backends.registry import BACKENDS
 from lig.cli.bench import bench_app
 from lig.cli.edit import edit as edit_command
 from lig.cli.generate import generate as generate_command
+from lig.cli.seeds import seeds as seeds_command
 from lig.core import config as cfg
 from lig.core import doctor as diag
-from lig.core import memory
+from lig.core import memory, run
 from lig.core.logs import report_engine_error
 from lig.models import cache, downloader
 from lig.models.registry import RegistryError, load_registry
@@ -96,11 +98,7 @@ app.command("generate")(handle_engine_errors(generate_command))
 app.command("edit")(handle_engine_errors(edit_command))
 
 
-@app.command()
-@handle_engine_errors
-def seeds() -> None:
-    """Explore seeds for a prompt."""
-    _stub("seeds")
+app.command("seeds")(handle_engine_errors(seeds_command))
 
 
 app.add_typer(bench_app, name="bench")
@@ -313,8 +311,9 @@ def _platform_info(models_dir: Path) -> diag.PlatformInfo:
     return diag.collect_platform_info(models_dir)
 
 
-def _engine_factories() -> dict[str, Callable[[], Backend]]:
-    return {name: cls for name, cls in BACKENDS.items()}
+def _engine_factories(settings: cfg.Settings) -> dict[str, Callable[[], Backend]]:
+    """One zero-arg factory per engine, built from the same settings the commands use."""
+    return {name: partial(run.make_backend, name, settings) for name in BACKENDS}
 
 
 def _fmt_bytes(value: int | None) -> str:
@@ -336,7 +335,9 @@ def doctor(
     except cfg.ConfigError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(1) from exc
-    report = diag.build_report(_platform_info(resolved.settings.models_dir), _engine_factories())
+    report = diag.build_report(
+        _platform_info(resolved.settings.models_dir), _engine_factories(resolved.settings)
+    )
     if as_json:
         typer.echo(json.dumps(report, indent=2))
         return
