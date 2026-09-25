@@ -1,0 +1,42 @@
+# Weight registry. Adapters resolve weights by role through
+# lig.models.registry.Registry.set_for(engine, platform).
+#
+# NOTE: sha256 and size_bytes are placeholders until the Phase 0 engine spike
+# (Story 02.1-004) pins the real artifacts; `lig models verify` must not be
+# trusted against these values before then.
+artifacts:
+  - name: qwen-image-2.1-q4-transformer
+    repo: Qwen/Qwen-Image-2.1-GGUF
+    filename: qwen-image-2.1-Q4_K_M.gguf
+    sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+    size_bytes: 1
+    engines: [sdcpp]
+    role: transformer
+    license: apache-2.0
+    url: https://huggingface.co/Qwen/Qwen-Image-2.1-GGUF/resolve/main/qwen-image-2.1-Q4_K_M.gguf
+  - name: qwen-image-2.1-text-encoder
+    repo: Qwen/Qwen-Image-2.1-GGUF
+    filename: qwen2.5-vl-7b-Q4_K_M.gguf
+    sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+    size_bytes: 1
+    engines: [sdcpp]
+    role: text_encoder
+    license: apache-2.0
+    url: https://huggingface.co/Qwen/Qwen-Image-2.1-GGUF/resolve/main/qwen2.5-vl-7b-Q4_K_M.gguf
+  - name: qwen-image-2.1-vae
+    repo: Qwen/Qwen-Image-2.1-GGUF
+    filename: qwen-image-2.1-vae.safetensors
+    sha256: "0000000000000000000000000000000000000000000000000000000000000000"
+    size_bytes: 1
+    engines: [sdcpp]
+    role: vae
+    license: apache-2.0
+    url: https://huggingface.co/Qwen/Qwen-Image-2.1-GGUF/resolve/main/qwen-image-2.1-vae.safetensors
+
+sets:
+  sdcpp-q4:
+    engine: sdcpp
+    artifacts:
+      - qwen-image-2.1-q4-transformer
+      - qwen-image-2.1-text-encoder
+      - qwen-image-2.1-vae
