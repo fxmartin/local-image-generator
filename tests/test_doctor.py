@@ -139,3 +139,67 @@ def test_cli_json(monkeypatch, tmp_path):
     data = json.loads(result.output)
     assert data["platform"]["arch"] == "x86_64"
     assert data["engines"][0]["engine"] == "sdcpp"
+
+
+def test_run_ok_maps_exit_code_and_errors(monkeypatch):
+    class Done:
+        returncode = 0
+
+    monkeypatch.setattr(doctor.subprocess, "run", lambda *a, **k: Done())
+    assert doctor._run_ok(["x"]) is True
+    Done.returncode = 1
+    assert doctor._run_ok(["x"]) is False
+
+    def boom(*a, **k):
+        raise OSError("nope")
+
+    monkeypatch.setattr(doctor.subprocess, "run", boom)
+    assert doctor._run_ok(["x"]) is False
+
+
+def test_probe_memory_reads_proc_meminfo(monkeypatch):
+    monkeypatch.setattr(
+        doctor.Path, "read_text", lambda self: "MemTotal: 2 kB\nMemAvailable: 1 kB\n"
+    )
+    assert doctor.probe_memory() == (2048, 1024)
+
+
+def test_probe_memory_sysconf_fallback_and_unknown(monkeypatch):
+    def no_proc(self):
+        raise OSError
+
+    monkeypatch.setattr(doctor.Path, "read_text", no_proc)
+    monkeypatch.setattr(doctor.os, "sysconf", lambda name: 4096)
+    assert doctor.probe_memory() == (4096 * 4096, None)
+
+    def bad(name):
+        raise ValueError(name)
+
+    monkeypatch.setattr(doctor.os, "sysconf", bad)
+    assert doctor.probe_memory() == (None, None)
+
+
+def test_disk_free_oserror_is_none(monkeypatch, tmp_path):
+    def boom(path):
+        raise OSError
+
+    monkeypatch.setattr(doctor.shutil, "disk_usage", boom)
+    assert doctor.disk_free_bytes(tmp_path) is None
+
+
+def test_cli_default_seams_and_config_error(monkeypatch, tmp_path):
+    seen = {}
+    monkeypatch.setattr(
+        cli_app.diag,
+        "collect_platform_info",
+        lambda models_dir: seen.setdefault("info", xps_info(str(models_dir))),
+    )
+    assert cli_app._platform_info(tmp_path) is seen["info"]
+    assert set(cli_app._engine_factories()) == set(cli_app.BACKENDS)
+
+    def bad(*a, **k):
+        raise cli_app.cfg.ConfigError("broken config")
+
+    monkeypatch.setattr(cli_app.cfg, "load_settings", bad)
+    result = runner.invoke(cli_app.app, ["doctor"])
+    assert result.exit_code == 1
