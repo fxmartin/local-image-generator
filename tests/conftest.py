@@ -1,7 +1,8 @@
-"""Shared fixtures: stub engine binaries installed under their real names on PATH."""
+"""Shared fixtures: the CI contract (offline, honest about root) and stub engine binaries."""
 
 import os
 import shutil
+import socket
 import stat
 from collections.abc import Callable
 from pathlib import Path
@@ -11,6 +12,37 @@ import pytest
 STUBS_DIR = Path(__file__).parent / "stubs"
 # Source file -> the real binary name the adapters look up on PATH.
 STUB_BINARIES = {"sd_cli_stub.py": "sd-cli", "ncnn_stub.py": "qwenimage-ncnn-vulkan"}
+
+requires_non_root = pytest.mark.skipif(
+    hasattr(os, "geteuid") and os.geteuid() == 0,
+    reason="euid == 0: permission-based fault injection is a no-op as root (CI runs as root)",
+)
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    config.addinivalue_line(
+        "markers", "network: test may open real sockets (none in v1; the release gate is offline)"
+    )
+
+
+class OfflineSocketError(RuntimeError):
+    """Raised when a test tries to create a socket without @pytest.mark.network."""
+
+
+@pytest.fixture(autouse=True)
+def _socket_guard(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
+    if request.node.get_closest_marker("network"):
+        return
+
+    class GuardedSocket(socket.socket):
+        # Subclass rather than a function so isinstance()/subclassing in the stdlib still work.
+        def __init__(self, *args, **kwargs):
+            raise OfflineSocketError(
+                "network access is forbidden in tests (CI has no network); "
+                "use a fake/local fixture or mark the test @pytest.mark.network"
+            )
+
+    monkeypatch.setattr(socket, "socket", GuardedSocket)
 
 
 @pytest.fixture
