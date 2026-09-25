@@ -5,6 +5,7 @@ import http.server
 import threading
 from collections.abc import Iterator
 
+import httpx
 import pytest
 from typer.testing import CliRunner
 
@@ -197,3 +198,14 @@ def test_416_on_resume_restarts_from_zero_with_warning(env):
     assert cache.artifact_status(models, art) == "installed"
     assert "restarting from zero" in result.output
     assert (models / "w.gguf").read_bytes() == PAYLOAD
+
+
+def test_pull_creates_nested_directories(env):
+    """ncnn bundle files live in subfolders of the models dir."""
+    models, art = env
+    nested = art.model_copy(update={"filename": "sub/dir/w.bin"})
+    with httpx.Client() as client:
+        outcome = downloader.pull_artifact(nested, models, client)
+    assert not outcome.skipped
+    assert (models / "sub/dir/w.bin").read_bytes() == PAYLOAD
+    assert cache.artifact_status(models, nested) == "installed"

@@ -33,6 +33,10 @@ class Artifact(BaseModel):
     license: str = Field(min_length=1)
     # Explicit rather than derived from repo/filename so non-HF mirrors work.
     url: str = Field(min_length=1)
+    # Human notes; the pin is free text ("sd.cpp master-913-b167b94") so an engine
+    # bump is reviewed together with the weights it was measured against.
+    description: str = ""
+    pinned_engine: str = ""
 
 
 class ArtifactSet(BaseModel):
