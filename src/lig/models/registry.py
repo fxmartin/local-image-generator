@@ -45,9 +45,17 @@ class ArtifactSet(BaseModel):
     artifacts: list[str] = Field(min_length=1)
 
 
+class EngineMemory(BaseModel):
+    """Peak-memory constants for one engine, calibrated against measured runs."""
+
+    factor: float = Field(gt=0)  # multiplier on the bytes of weights held in memory
+    activation_bytes_per_pixel: int = Field(ge=0)  # working memory per output pixel
+
+
 class Registry(BaseModel):
     artifacts: list[Artifact]
     sets: dict[str, ArtifactSet] = {}
+    engine_memory: dict[str, EngineMemory] = {}
 
     def get(self, name: str) -> Artifact:
         for artifact in self.artifacts:

@@ -251,6 +251,17 @@ artifacts:
     description: "ncnn BF16 model file (qwenimage21/vision/vision_pos_embed.f32) for qwenimage-ncnn-vulkan; the full bundle is about 31 GB."
     pinned_engine: "qwenimage-ncnn-vulkan release 20260924; model repo revision d92a054c94217b72dd8bfd6c2fe687e990f35fc6"
 
+# Pre-flight memory estimate: sum(loaded weights) * factor + bytes_per_pixel * w * h.
+# sdcpp calibrated on the XPS spike (docs/bench/xps13.md): 8949.76 MB of weights for
+# 9.90 GB of files (factor 0.95) and a 3551 MB VAE decode at 1024² (3400 B/px).
+engine_memory:
+  sdcpp:
+    factor: 0.95
+    activation_bytes_per_pixel: 3400
+  ncnn:
+    factor: 1.0
+    activation_bytes_per_pixel: 3400
+
 sets:
   # Default for sd.cpp: first set listed for the engine.
   sdcpp-q4:
