@@ -125,18 +125,18 @@
 **Risk Level**: Medium
 
 ##### Story 02.2-002: stable-diffusion.cpp backend adapter
-**User Story**: As FX, I want an `sdcpp` backend that maps `GenerateRequest`/`EditRequest` to `sd-cli` flags (diffusion model, VAE, LLM, mmproj for edits, size, steps, seed, cfg default 6.0, Euler, offload) and reports its version, so that the winning XPS engine is driven by the same CLI as every other engine.
+**User Story**: As FX, I want an `sdcpp` backend that maps `GenerateRequest`/`EditRequest` to `sd-cli` flags (diffusion model, VAE, LLM, mmproj for edits, size, steps, seed, cfg default 1.0, Euler, offload) and reports its version, so that the winning XPS engine is driven by the same CLI as every other engine.
 **Priority**: Must Have
 **Story Points**: 5
 
 **Acceptance Criteria**:
-- **Given** a `GenerateRequest` **When** `sdcpp.generate` runs against the stub binary **Then** the recorded argv contains `--diffusion-model`, `--vae`, `--llm`, `-p`, `-W`, `-H`, `--steps`, `-s`, `--cfg-scale 6.0`, `--sampling-method euler`, `-o <tmp.png>` with the values from the request and the registry paths.
+- **Given** a `GenerateRequest` **When** `sdcpp.generate` runs against the stub binary **Then** the recorded argv contains `--diffusion-model`, `--vae`, `--llm`, `-p`, `-W`, `-H`, `--steps`, `-s`, `--cfg-scale 1.0`, `--sampling-method euler`, `-o <tmp.png>` with the values from the request and the registry paths; a request with `guidance` set passes that value instead.
 - **Given** an `EditRequest` **When** `sdcpp.edit` runs **Then** argv additionally has `--llm_vision <mmproj>` and `-r <reference>`; without the mmproj file cached, `available()` reports `edit unsupported: mmproj missing`.
 - **Given** the engine binary path **When** `available()` runs **Then** it checks the binary, the four weight files and the platform, and returns a reason string for the first failure.
 - **Given** `sd-cli --version` or the build banner **When** parsed **Then** `ImageResult.engine_version` holds the commit/version string; unknown formats yield `unknown` rather than failing.
 - **Given** config `engines.sdcpp.extra_args` **When** set **Then** the args are appended verbatim, so spike-discovered flags (`--model-args qwen_image_2_1_prefix_cache=false`) need no code change.
 
-**Technical Notes**: Flag names come from `docs/qwen_image_2.1.md` in sd.cpp at the pinned commit; keep the mapping in one table so an upstream rename is a one-line fix. Transparent output is Epic-07.
+**Technical Notes**: Flag names come from `docs/qwen_image_2.1.md` in sd.cpp at the pinned commit; keep the mapping in one table so an upstream rename is a one-line fix. Transparent output is Epic-07. Default guidance is 1.0, not the 6.0 in sd.cpp's docs: Qwen-Image-2.1 is guidance-free, and on the XPS 1.0 halves the time (1248 s vs 2704 s at 1024², 40 steps) with no visible quality loss (see `docs/bench/xps13.md`).
 
 **Definition of Done**:
 - [ ] Code implemented and peer reviewed
