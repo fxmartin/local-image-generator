@@ -36,7 +36,7 @@ testpaths = ["tests"]
 addopts = "--cov --cov-report=term-missing"
 
 [tool.coverage.run]
-source = ["src/lig/core", "src/lig/models", "src/lig/cli"]
+source = ["src/lig/backends", "src/lig/core", "src/lig/models", "src/lig/cli"]
 
 [tool.coverage.report]
 fail_under = 85
