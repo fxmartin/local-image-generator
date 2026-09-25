@@ -37,6 +37,7 @@ class SidecarSchema(BaseModel):
     created_at: str
     source_path: str | None = None
     source_sha256: str | None = None
+    batch_id: str | None = None  # shared by every image of one `lig seeds` run
 
 
 def slugify(prompt: str) -> str:
@@ -46,7 +47,9 @@ def slugify(prompt: str) -> str:
     return slug or "image"
 
 
-def _sidecar_for(result: ImageResult, created_at: datetime) -> SidecarSchema:
+def _sidecar_for(
+    result: ImageResult, created_at: datetime, batch_id: str | None = None
+) -> SidecarSchema:
     req = result.request
     source = isinstance(req, EditRequest)
     return SidecarSchema(
@@ -65,6 +68,7 @@ def _sidecar_for(result: ImageResult, created_at: datetime) -> SidecarSchema:
         created_at=created_at.isoformat(),
         source_path=str(req.reference_image) if source else None,
         source_sha256=req.reference_sha256 if source else None,
+        batch_id=batch_id,
     )
 
 
@@ -104,7 +108,11 @@ def _png_with_metadata(png: bytes, sidecar: SidecarSchema, sidecar_name: str) ->
 
 
 def write_result(
-    result: ImageResult, out_dir: Path | None = None, *, now: datetime | None = None
+    result: ImageResult,
+    out_dir: Path | None = None,
+    *,
+    now: datetime | None = None,
+    batch_id: str | None = None,
 ) -> Path:
     """Write PNG + sidecar into out_dir (created if missing); return the PNG path.
 
@@ -113,7 +121,7 @@ def write_result(
     """
     out_dir = out_dir or DEFAULT_OUTPUT_DIR
     created_at = now or datetime.now()  # local time, per spec
-    sidecar = _sidecar_for(result, created_at)
+    sidecar = _sidecar_for(result, created_at, batch_id)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     stem = f"{created_at:%Y%m%d-%H%M%S}_{slugify(sidecar.prompt)}_s{sidecar.seed}"
