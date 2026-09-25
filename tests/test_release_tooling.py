@@ -194,3 +194,81 @@ def test_ci_has_commit_format_job_without_node_in_test_image():
     assert job["rules"][0]["if"] == '$CI_PIPELINE_SOURCE == "merge_request_event"'
     assert ci["variables"].get("GIT_DEPTH") == "0"
     assert any("scripts/release_check.py" in line for line in ci["release-check"]["script"])
+
+
+# --- coverage gaps: changelog CLI, git range, edge cases --------------------------------
+
+
+def _git_repo(path, *messages):
+    def git(*args):
+        subprocess.run(
+            ["git", "-C", str(path), "-c", "user.name=t", "-c", "user.email=t@t", *args],
+            check=True,
+            capture_output=True,
+        )
+
+    git("init", "-q")
+    for message in messages:
+        git("commit", "-q", "--allow-empty", "-m", message)
+    return git
+
+
+def test_render_section_skips_non_conventional_and_reads_breaking_footer():
+    section = changelog.render_section(
+        "2.0.0",
+        "2026-01-01",
+        [
+            ("not conventional", ""),
+            ("chore: tidy", ""),
+            ("feat(api): new route", "BREAKING CHANGE: route renamed"),
+            ("fix!: drop flag", ""),
+            ("feat: unscoped", ""),
+        ],
+    )
+    assert "not conventional" not in section and "tidy" not in section
+    assert "- **api:** route renamed" in section
+    assert "- drop flag" in section
+    assert "- unscoped" in section
+
+
+def test_prepend_appends_when_no_release_yet():
+    out = changelog.prepend("# Changelog\n", "1.0.0", "## [1.0.0] - 2026-01-01\n")
+    assert out == "# Changelog\n\n## [1.0.0] - 2026-01-01\n"
+
+
+def test_commits_since_returns_header_body_pairs(tmp_path, monkeypatch):
+    git = _git_repo(tmp_path, "feat: first")
+    git("tag", "v0.1.0")
+    git("commit", "-q", "--allow-empty", "-m", "fix(core): second", "-m", "body text")
+    monkeypatch.chdir(tmp_path)
+    assert changelog.commits_since("v0.1.0") == [("fix(core): second", "body text")]
+    assert [h for h, _ in changelog.commits_since(None)] == ["fix(core): second", "feat: first"]
+
+
+def test_main_prints_section_without_write(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(changelog, "commits_since", lambda since: [("feat: shiny", "")])
+    assert changelog.main(["1.2.3", "--date", "2026-02-03"]) == 0
+    assert "## [1.2.3] - 2026-02-03" in capsys.readouterr().out
+
+
+def test_main_write_creates_and_is_idempotent(tmp_path, monkeypatch):
+    target = tmp_path / "CHANGELOG.md"
+    monkeypatch.setattr(changelog, "CHANGELOG", target)
+    monkeypatch.setattr(changelog, "commits_since", lambda since: [("fix: bug", "")])
+    args = ["1.2.3", "--date", "2026-02-03", "--write"]
+    assert changelog.main(args) == 0
+    first = target.read_text()
+    assert first.startswith("# Changelog") and "- bug" in first
+    assert changelog.main(args) == 0
+    assert target.read_text() == first
+
+
+def test_commit_lint_main_requires_one_argument(capsys):
+    assert commit_lint.main([]) == 2
+    assert "Usage" in capsys.readouterr().err
+
+
+def test_lock_version_is_none_when_project_missing_from_lock(tmp_path):
+    root = _project(tmp_path)
+    (root / "uv.lock").write_text('[[package]]\nname = "other"\nversion = "1.0.0"\n')
+    assert release_check.lock_version(root) is None
