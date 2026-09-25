@@ -187,7 +187,18 @@ Settings resolve as flag > `LIG_*` env > `~/.config/lig/config.toml` > defaults.
 ```sh
 uv sync                # runtime + dev dependencies
 uv run ruff check .
+uv run ruff format --check .
 uv run pytest          # offline, no weights or GPU; coverage gate 85 %
 ```
 
 Engines are never run in CI; per-host measurements live in [`docs/bench/`](./docs/bench/).
+
+CI (`.gitlab-ci.yml`) runs the same checks in an offline, root, Linux/arm64
+container: `uv sync --frozen` with `UV_OFFLINE=1`, from the project's uv cache on
+the CI host. After any `uv.lock` change, re-warm that cache before pushing (recipe in
+the `.gitlab-ci.yml` header), or the install step fails. Tests therefore:
+
+- cannot open sockets (an autouse guard in `tests/conftest.py` raises; opt out with
+  `@pytest.mark.network`, unused in v1);
+- must not rely on filesystem permissions, which no-op as root. If unavoidable, mark
+  the test `@requires_non_root` (skips with an explicit `euid == 0` reason).

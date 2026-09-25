@@ -1,0 +1,44 @@
+# Runs on the local-ci-cd GitLab (home-lab): Linux/arm64 container, root, NO network.
+# Everything below must work offline; see CLAUDE.md "CI/CD".
+#
+# Image: the platform's uv toolchain image (ghcr.io/astral-sh/uv, python3.12-alpine) plus
+# git, pinned by digest and pulled through the zot proxy at 127.0.0.1:5001. It is the same
+# Alpine base the cache is warmed with, so the cached wheels (musllinux) are the ones the
+# job resolves; a glibc image would miss every native wheel.
+#
+# Dependencies: prepare_exec mounts the project-keyed uv cache volume
+# (local-ci-cd-cache-uv-root-local-image-generator) and sets UV_CACHE_DIR to it. Do not
+# override UV_CACHE_DIR here. After any uv.lock change, re-warm it on home-lab before
+# pushing, or the job fails at install (plain `uv sync`, not `cache warm-deps`: the
+# latter skips the project, so hatchling never reaches the cache):
+#
+#   rsync -a --exclude .git --exclude .venv ./ home-lab:~/ci-warm/local-image-generator/
+#   ssh home-lab 'container run --rm -v local-ci-cd-cache-uv-root-local-image-generator:/cache/uv -v ~/ci-warm/local-image-generator:/src:ro -e UV_CACHE_DIR=/cache/uv -e UV_PYTHON_DOWNLOADS=never ghcr.io/astral-sh/uv@sha256:1b0697fa66367beef4ddc59d1ac6fac9cd8ab6bc09bab9951e4e0e479786cf0f sh -c "cp -r /src /work && cd /work && uv sync --frozen"'
+#
+# tests/test_ci_contract.py asserts this file keeps the contract.
+
+# MR pipelines and pushes to the default branch only: one pipeline per commit, and the
+# merge_request_event one is what the sdlc merge gate polls.
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+variables:
+  # A cache miss must fail the job, not quietly reach for the network.
+  UV_OFFLINE: "1"
+  UV_PYTHON_DOWNLOADS: never
+  UV_LINK_MODE: copy
+
+stages:
+  - test
+
+test:
+  stage: test
+  image: 127.0.0.1:5001/local/uv-git@sha256:72794e132d0316ef8c8b3a76ec4c0ec828eb56329f945bd0f7b63d6c8dbaf17f
+  script:
+    - uv sync --frozen
+    - uv run ruff check .
+    - uv run ruff format --check .
+    # Coverage gate (fail_under = 85) lives in pyproject.toml; pytest exits non-zero below it.
+    - uv run pytest --cov
