@@ -1,5 +1,6 @@
 """Shared fixtures: the CI contract (offline, honest about root) and stub engine binaries."""
 
+import ipaddress
 import os
 import shutil
 import socket
@@ -21,12 +22,26 @@ requires_non_root = pytest.mark.skipif(
 
 def pytest_configure(config: pytest.Config) -> None:
     config.addinivalue_line(
-        "markers", "network: test may open real sockets (none in v1; the release gate is offline)"
+        "markers",
+        "network: test may reach non-loopback addresses (none in v1; the release gate is offline)",
     )
 
 
 class OfflineSocketError(RuntimeError):
-    """Raised when a test tries to create a socket without @pytest.mark.network."""
+    """Raised when a test reaches a non-loopback address without @pytest.mark.network."""
+
+
+def _is_loopback(address: object) -> bool:
+    # AF_UNIX paths and loopback hosts never leave the job container, so they work offline.
+    if not isinstance(address, tuple):
+        return True
+    host = address[0]
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
 
 
 @pytest.fixture(autouse=True)
@@ -36,11 +51,28 @@ def _socket_guard(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatc
 
     class GuardedSocket(socket.socket):
         # Subclass rather than a function so isinstance()/subclassing in the stdlib still work.
-        def __init__(self, *args, **kwargs):
-            raise OfflineSocketError(
-                "network access is forbidden in tests (CI has no network); "
-                "use a fake/local fixture or mark the test @pytest.mark.network"
-            )
+        def _check(self, address: object) -> None:
+            if not _is_loopback(address):
+                raise OfflineSocketError(
+                    f"network access to {address!r} is forbidden in tests (CI has no network); "
+                    "use a fake/loopback fixture or mark the test @pytest.mark.network"
+                )
+
+        def connect(self, address):
+            self._check(address)
+            return super().connect(address)
+
+        def connect_ex(self, address):
+            self._check(address)
+            return super().connect_ex(address)
+
+        def bind(self, address):
+            self._check(address)
+            return super().bind(address)
+
+        def sendto(self, data, *args):
+            self._check(args[-1])
+            return super().sendto(data, *args)
 
     monkeypatch.setattr(socket, "socket", GuardedSocket)
 

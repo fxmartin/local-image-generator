@@ -1,5 +1,3 @@
-import importlib.util
-
 import pytest
 from typer.testing import CliRunner
 
@@ -17,19 +15,12 @@ def test_help_lists_all_subcommands():
         assert name in result.output
 
 
-STUBS = [n for n in SUBCOMMANDS if n not in ("config", "doctor")]
+# serve is covered by test_packaging (behaviour depends on the optional extra)
+STUBS = [n for n in SUBCOMMANDS if n not in ("config", "models", "doctor", "serve")]
 
 
 @pytest.mark.parametrize("name", STUBS)
-def test_stub_exits_zero(name, monkeypatch):
-    # `serve` checks for its optional extra; pin it as installed so the result does not
-    # depend on whether this venv was synced with `--extra serve` (CI's is not).
-    real_find_spec = importlib.util.find_spec
-    monkeypatch.setattr(
-        importlib.util,
-        "find_spec",
-        lambda mod, *a: object() if mod in {"fastapi", "uvicorn"} else real_find_spec(mod, *a),
-    )
+def test_stub_exits_zero(name):
     result = runner.invoke(app, [name])
     assert result.exit_code == 0
     assert "not implemented" in result.output

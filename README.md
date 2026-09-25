@@ -44,8 +44,8 @@ container with `uv sync --frozen` from the executor's project uv cache volume
 (re-warm it on home-lab after any `uv.lock` change; recipe in `.gitlab-ci.yml`).
 Tests therefore:
 
-- cannot open sockets (an autouse guard in `tests/conftest.py` raises; opt out with
-  `@pytest.mark.network`, unused in v1);
+- cannot reach non-loopback addresses (an autouse guard in `tests/conftest.py` raises;
+  in-process loopback servers are fine; opt out with `@pytest.mark.network`, unused in v1);
 - must not rely on filesystem permissions, which no-op as root. If unavoidable, mark
   the test `@requires_non_root` (skips with an explicit `euid == 0` reason).
 
@@ -62,6 +62,28 @@ env vars, e.g. `LIG_SERVE__BIND`.
 - `lig config init` writes a commented `config.toml`; it refuses if one already exists.
 - Unknown keys in the file produce a warning naming the key and line; the run continues.
 - `output_dir` and `models_dir` expand a leading `~` to your home directory.
+
+Model weights are cached under the platform cache dir (`~/.cache/lig/models` on Linux);
+override with `LIG_MODELS_DIR` or `models_dir`. The directory is created on first use.
+
+`lig models list [--engine sdcpp] [--json]` shows each artifact's name, role, engines, size,
+license and status (`installed`, `missing`, `partial` = a `.part` file exists, `unverified` =
+present without a `.sha256.ok` marker), plus total cache size and free disk.
+
+`lig models pull [NAME | --engine E] [--force]` downloads weights into the cache. It prints the
+total bytes to fetch and the free disk first, and refuses if free disk is under total + 2 GB
+(`--force` overrides). Interrupted downloads resume from the `.part` file with an HTTP `Range`
+request (a server that ignores it triggers a warning and a restart from zero). The sha256 is
+checked on completion: a mismatch renames the file `.corrupt`, prints expected and actual
+hashes, exits 1 and writes no marker. Verified artifacts are skipped as `already installed`;
+`--force` re-downloads them.
+
+`lig models verify [NAME]` re-hashes installed artifacts (all of them by default) with a progress
+bar. Healthy files print `NAME: ok`; a mismatch is reported, its `.sha256.ok` marker removed
+and the command exits 1. `lig models rm NAME [--yes]` deletes the artifact and any `.part` /
+`.corrupt` leftovers after a confirmation showing the size, and warns first if the configured
+default engine needs it. `lig models path NAME` prints the absolute path of an installed
+artifact; if it is not installed it prints nothing and exits 1.
 
 Keys: `engine`, `output_dir`, `models_dir`, `default_host`, `steps`, `size`, `serve.bind`.
 
