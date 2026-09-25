@@ -67,6 +67,13 @@ checked on completion: a mismatch renames the file `.corrupt`, prints expected a
 hashes, exits 1 and writes no marker. Verified artifacts are skipped as `already installed`;
 `--force` re-downloads them.
 
+`lig models verify [NAME]` re-hashes installed artifacts (all of them by default) with a progress
+bar. Healthy files print `NAME: ok`; a mismatch is reported, its `.sha256.ok` marker removed
+and the command exits 1. `lig models rm NAME [--yes]` deletes the artifact and any `.part` /
+`.corrupt` leftovers after a confirmation showing the size, and warns first if the configured
+default engine needs it. `lig models path NAME` prints the absolute path of an installed
+artifact; if it is not installed it prints nothing and exits 1.
+
 Keys: `engine`, `output_dir`, `models_dir`, `default_host`, `steps`, `size`, `serve.bind`.
 
 ## Diagnostics

@@ -14,12 +14,12 @@ from pathlib import Path
 
 import httpx
 
-from lig.models.cache import artifact_status, marker_path
+from lig.models.cache import CHUNK as _CHUNK
+from lig.models.cache import artifact_status, hash_file, marker_path
 from lig.models.registry import Artifact
 
 # Headroom on top of the download itself, so the disk is never filled to the brim.
 DISK_MARGIN_BYTES = 2 * 1024**3
-_CHUNK = 1024 * 1024
 
 ProgressCallback = Callable[[int, int], None]  # (bytes on disk so far, expected total)
 
@@ -63,14 +63,6 @@ def remaining_bytes(models_dir: Path, artifacts: list[Artifact], force: bool) ->
     return total
 
 
-def _hash_file(path: Path) -> "hashlib._Hash":
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        while chunk := handle.read(_CHUNK):
-            digest.update(chunk)
-    return digest
-
-
 def pull_artifact(
     artifact: Artifact,
     models_dir: Path,
@@ -109,7 +101,7 @@ def pull_artifact(
                 )
                 outcome.restarted = True
                 offset = 0
-            digest = _hash_file(part) if offset else hashlib.sha256()
+            digest = hash_file(part) if offset else hashlib.sha256()
             done = offset
             with part.open("ab" if offset else "wb") as handle:
                 for chunk in resp.iter_bytes(_CHUNK):

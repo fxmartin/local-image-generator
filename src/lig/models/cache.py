@@ -5,11 +5,15 @@ is in flight or was interrupted; a ``<filename>.sha256.ok`` marker (written by
 verification) means the checksum was confirmed.
 """
 
+import hashlib
 import shutil
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal
 
 from lig.models.registry import Artifact, Registry
+
+CHUNK = 1024 * 1024
 
 Status = Literal["installed", "missing", "partial", "unverified"]
 
@@ -62,3 +66,44 @@ def human_size(size: int) -> str:
             return f"{value:.0f} {unit}" if unit == "B" else f"{value:.1f} {unit}"
         value /= 1024
     return f"{value:.1f} TB"
+
+
+def hash_file(path: Path, on_progress: Callable[[int], None] | None = None) -> "hashlib._Hash":
+    """sha256 of ``path``, shared by ``pull`` (resume) and ``verify``."""
+    digest = hashlib.sha256()
+    done = 0
+    with path.open("rb") as handle:
+        while chunk := handle.read(CHUNK):
+            digest.update(chunk)
+            done += len(chunk)
+            if on_progress:
+                on_progress(done)
+    return digest
+
+
+def verify_artifact(
+    models_dir: Path, artifact: Artifact, on_progress: Callable[[int], None] | None = None
+) -> str | None:
+    """Re-hash an installed file. Returns the actual digest on mismatch, else None.
+
+    A mismatch removes the ``.ok`` marker so the file no longer reads as installed;
+    a match (re)writes it.
+    """
+    actual = hash_file(models_dir / artifact.filename, on_progress).hexdigest()
+    marker = marker_path(models_dir, artifact)
+    if actual == artifact.sha256.lower():
+        marker.write_text("")
+        return None
+    marker.unlink(missing_ok=True)
+    return actual
+
+
+def artifact_files(models_dir: Path, artifact: Artifact) -> list[Path]:
+    """Every on-disk file belonging to ``artifact`` (weights, marker, partial/corrupt leftovers)."""
+    candidates = [
+        models_dir / artifact.filename,
+        marker_path(models_dir, artifact),
+        models_dir / f"{artifact.filename}.part",
+        models_dir / f"{artifact.filename}.corrupt",
+    ]
+    return [p for p in candidates if p.is_file()]
