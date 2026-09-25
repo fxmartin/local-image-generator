@@ -8,21 +8,19 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-import typer
 import httpx
+import typer
 from rich.console import Console
 from rich.progress import BarColumn, DownloadColumn, Progress, TextColumn, TransferSpeedColumn
 from rich.table import Table
 from rich.text import Text
 
+from lig import __version__
 from lig.backends.base import Backend, EngineError
 from lig.backends.registry import BACKENDS
 from lig.core import config as cfg
 from lig.core import doctor as diag
 from lig.core.logs import report_engine_error
-
-from lig import __version__
-from lig.core import config as cfg
 from lig.models import cache, downloader
 from lig.models.registry import RegistryError, load_registry
 

@@ -19,6 +19,7 @@ PAYLOAD = bytes(range(256)) * 400  # ~100 KB
 
 class _Handler(http.server.BaseHTTPRequestHandler):
     honor_range = True
+    reject_range = False
     ranges: list[str | None] = []
 
     def log_message(self, *args) -> None:
@@ -29,6 +30,11 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         type(self).ranges.append(rng)
         if self.path == "/missing":
             self.send_response(404)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        if rng and type(self).reject_range:
+            self.send_response(416)
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
@@ -45,6 +51,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 @pytest.fixture
 def server() -> Iterator[str]:
     _Handler.honor_range = True
+    _Handler.reject_range = False
     _Handler.ranges = []
     httpd = http.server.ThreadingHTTPServer(("127.0.0.1", 0), _Handler)
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
@@ -178,3 +185,15 @@ def test_http_error_keeps_part_and_exits_1(env, server, monkeypatch):
     result = runner.invoke(app, ["models", "pull", "w"])
     assert result.exit_code == 1
     assert "failed" in result.output
+
+
+def test_416_on_resume_restarts_from_zero_with_warning(env):
+    models, art = env
+    _Handler.reject_range = True
+    (models / "w.gguf.part").parent.mkdir(parents=True, exist_ok=True)
+    (models / "w.gguf.part").write_bytes(PAYLOAD[:1000])
+    result = runner.invoke(app, ["models", "pull", "w"])
+    assert result.exit_code == 0, result.output
+    assert cache.artifact_status(models, art) == "installed"
+    assert "restarting from zero" in result.output
+    assert (models / "w.gguf").read_bytes() == PAYLOAD
