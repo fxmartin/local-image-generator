@@ -116,7 +116,7 @@ def _patch(monkeypatch):
     monkeypatch.setattr(
         cli_app,
         "_engine_factories",
-        lambda: _factories(
+        lambda settings: _factories(
             _Engine("sdcpp", False, "sd-cli not found on PATH (set engines.sdcpp.binary)")
         ),
     )
@@ -195,7 +195,10 @@ def test_cli_default_seams_and_config_error(monkeypatch, tmp_path):
         lambda models_dir: seen.setdefault("info", xps_info(str(models_dir))),
     )
     assert cli_app._platform_info(tmp_path) is seen["info"]
-    assert set(cli_app._engine_factories()) == set(cli_app.BACKENDS)
+    factories = cli_app._engine_factories(cli_app.cfg.load_settings().settings)
+    assert set(factories) == set(cli_app.BACKENDS)
+    for name, factory in factories.items():
+        assert factory().name == name  # every engine constructs from real settings
 
     def bad(*a, **k):
         raise cli_app.cfg.ConfigError("broken config")
