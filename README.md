@@ -28,3 +28,17 @@ uv run pytest      # coverage gate: 85 % on core, models, cli
 ```
 
 Optional extras: `lig[serve]` (FastAPI daemon), `lig[mlx]` (mflux on Apple Silicon).
+
+## Configuration
+
+Settings resolve in this order: command-line flag > `LIG_*` environment variable >
+`~/.config/lig/config.toml` (platform config dir) > built-in default. Nested keys use `__` in
+env vars, e.g. `LIG_SERVE__BIND`.
+
+- `lig config show` prints every effective value, which layer it came from
+  (`flag`, `env`, `file` or `default`) and the config file path used.
+- `lig config init` writes a commented `config.toml`; it refuses if one already exists.
+- Unknown keys in the file produce a warning naming the key and line; the run continues.
+- `output_dir` and `models_dir` expand a leading `~` to your home directory.
+
+Keys: `engine`, `output_dir`, `models_dir`, `default_host`, `steps`, `size`, `serve.bind`.

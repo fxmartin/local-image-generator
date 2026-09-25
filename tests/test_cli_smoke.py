@@ -15,7 +15,10 @@ def test_help_lists_all_subcommands():
         assert name in result.output
 
 
-@pytest.mark.parametrize("name", SUBCOMMANDS)
+STUBS = [n for n in SUBCOMMANDS if n != "config"]
+
+
+@pytest.mark.parametrize("name", STUBS)
 def test_stub_exits_zero(name):
     result = runner.invoke(app, [name])
     assert result.exit_code == 0
