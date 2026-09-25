@@ -89,11 +89,16 @@ The `ncnn` engine needs `ncnn_binary` (or `qwenimage-ncnn-vulkan` on `PATH`) and
 
 ## Generating
 
-`lig generate PROMPT [--size WxH] [--steps N] [--seed S] [--engine E] [--out DIR] [--negative TEXT] [--guidance G] [--force]`
+`lig generate PROMPT [--size WxH] [--steps N] [--seed S] [--engine E] [--out DIR] [--negative TEXT] [--guidance G] [--force] [--quiet]`
 writes a PNG and a JSON sidecar to `./outputs` (or `--out` / `output_dir`) and prints the PNG path
 as its last line. Flags override `LIG_*` env, which overrides `config.toml`. On Linux, with no
 `--size`/`--steps` flag or config value, it uses 768x768 and 30 steps (the XPS local fallback).
 `--engine fake` renders a seeded gradient without weights.
+
+Progress goes to stderr: on a terminal, a bar with `step 12/40`, elapsed and ETA (a spinner with
+elapsed time for `ncnn`, which reports no steps), then load and total times. When stdout is not a
+TTY or `NO_COLOR` is set, it prints plain lines at most once per 10 % with no ANSI codes.
+`--quiet`/`-q` suppresses progress and prints only the final path.
 
 Exit codes: 0 ok, 1 engine error, 2 usage (bad size, unknown engine, invalid config), 3 memory
 pre-flight refusal (`--force` overrides), 4 engine unavailable (the message carries the reason;

@@ -166,3 +166,71 @@ def test_sidecar_records_request(tmp_path):
 
 def test_memory_preflight_still_exported():
     assert callable(cli_app.memory_preflight)
+
+
+def _run_progress(steps_seq, **kw):
+    import io
+
+    from lig.cli.progress import generation_progress
+
+    buf = io.StringIO()
+    ticks = iter(range(0, 1000, 2))
+    with generation_progress(err=buf, clock=lambda: float(next(ticks)), **kw) as cb:
+        if cb:
+            for step, total in steps_seq:
+                cb(step, total)
+    return buf.getvalue()
+
+
+def test_plain_progress_at_most_once_per_ten_percent():
+    out = _run_progress([(i, 40) for i in range(1, 41)], rich=False)
+    lines = [line for line in out.splitlines() if line.startswith("step")]
+    assert len(lines) <= 10
+    assert lines[-1].startswith("step 40/40")
+    assert "\x1b" not in out
+    assert "loaded in" in out and "total" in out
+
+
+def test_quiet_progress_yields_no_callback_and_no_output():
+    assert _run_progress([(1, 2)], quiet=True) == ""
+
+
+def test_rich_bar_shows_step_count_and_summary():
+    out = _run_progress([(12, 40), (13, 40)], rich=True)
+    assert "step 13/40" in out
+    assert "loaded in" in out
+
+
+def test_rich_spinner_when_no_step_progress():
+    out = _run_progress([], rich=True, indeterminate=True)
+    assert "generating" in out and "step" not in out
+    assert "loaded in" in out
+
+
+def test_use_rich_respects_no_color(monkeypatch):
+    import io
+
+    from lig.cli.progress import use_rich
+
+    class Tty(io.StringIO):
+        def isatty(self):
+            return True
+
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    assert use_rich(Tty())
+    monkeypatch.setenv("NO_COLOR", "1")
+    assert not use_rich(Tty())
+    assert not use_rich(io.StringIO())
+
+
+def test_cli_quiet_prints_only_path():
+    result = runner.invoke(app, ["generate", "x", "--engine", "fake", "--quiet"])
+    assert result.exit_code == 0, result.output
+    assert len(result.output.strip().splitlines()) == 1
+
+
+def test_cli_non_tty_plain_progress_and_path_last():
+    result = runner.invoke(app, ["generate", "x", "--engine", "fake"])
+    assert result.exit_code == 0, result.output
+    assert "step" in result.output and "\x1b" not in result.output
+    assert result.output.strip().splitlines()[-1].endswith(".png")

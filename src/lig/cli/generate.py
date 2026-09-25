@@ -5,6 +5,7 @@ from pathlib import Path
 import typer
 
 from lig.backends.base import EngineUnavailable
+from lig.cli.progress import generation_progress
 from lig.core import config as cfg
 from lig.core import run
 from lig.models.registry import RegistryError, load_registry
@@ -29,6 +30,7 @@ def generate(
     negative: str | None = typer.Option(None, "--negative", help="Negative prompt."),
     guidance: float | None = typer.Option(None, "--guidance", help="Guidance scale."),
     force: bool = typer.Option(False, "--force", help="Run even if memory looks too tight."),
+    quiet: bool = typer.Option(False, "--quiet", "-q", help="Print only the final path."),
 ) -> None:
     """Generate an image from a text prompt."""
     from lig.cli.app import memory_preflight  # late: app imports this module
@@ -71,5 +73,8 @@ def generate(
     if figures is not None:
         memory_preflight(figures[0], figures[1], force)
 
-    path = run.run_generate(backend, request, settings.output_dir)
+    with generation_progress(
+        quiet=quiet, indeterminate=bool(getattr(backend, "progress_indeterminate", False))
+    ) as on_progress:
+        path = run.run_generate(backend, request, settings.output_dir, on_progress)
     typer.echo(str(path))
