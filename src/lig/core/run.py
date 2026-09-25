@@ -1,9 +1,12 @@
 """Generation orchestration shared by `generate`, and later `edit`, `seeds` and the daemon."""
 
+import hashlib
 import re
 import sys
 from collections.abc import Callable
 from pathlib import Path
+
+from PIL import Image, UnidentifiedImageError
 
 from lig.backends.base import Availability, Backend, EngineUnavailable, ProgressCallback
 from lig.backends.registry import BACKENDS, get_backend
@@ -14,6 +17,7 @@ from lig.core.models import (
     MAX_SIZE,
     MIN_SIZE,
     SIZE_STEP,
+    EditRequest,
     GenerateRequest,
     ImageResult,
 )
@@ -108,6 +112,53 @@ def build_request(
         raise UsageError(str(exc)) from exc
 
 
+def default_edit_size(image: Path) -> tuple[int, int]:
+    """The source size rounded down to multiples of 32, clamped to the supported range."""
+    try:
+        with Image.open(image) as img:
+            width, height = img.size
+    except (OSError, UnidentifiedImageError) as exc:
+        raise UsageError(f"{image} is not a readable image: {exc}") from exc
+    return tuple(max(MIN_SIZE, min(MAX_SIZE, d // SIZE_STEP * SIZE_STEP)) for d in (width, height))  # type: ignore[return-value]
+
+
+def build_edit_request(
+    prompt: str,
+    image: Path,
+    resolved: cfg.ResolvedConfig,
+    *,
+    size: str | None = None,
+    steps: int | None = None,
+    seed: int | None = None,
+    strength: float | None = None,
+) -> EditRequest:
+    if not prompt.strip():
+        raise UsageError("the prompt must not be empty")
+    if size is None:
+        width, height = default_edit_size(image)
+        size = f"{width}x{height}"
+    (width, height), steps = effective_size_and_steps(resolved, size, steps)
+    try:
+        digest = hashlib.sha256(image.read_bytes()).hexdigest()
+    except OSError as exc:
+        raise UsageError(f"{image} is not a readable image: {exc}") from exc
+    fields: dict[str, object] = {
+        "prompt": prompt,
+        "width": width,
+        "height": height,
+        "steps": steps,
+        "reference_image": image,
+        "reference_sha256": digest,
+        "strength": strength,
+    }
+    if seed is not None:
+        fields["seed"] = seed
+    try:
+        return EditRequest(**fields)
+    except ValueError as exc:
+        raise UsageError(str(exc)) from exc
+
+
 def negative_prompt_warning(request: GenerateRequest) -> str | None:
     """Engines run guidance-free (1.0) unless told otherwise, and then ignore the negative."""
     if request.negative_prompt and (request.guidance is None or request.guidance <= 1.0):
@@ -171,3 +222,14 @@ def run_generate(
 ) -> Path:
     """Generate and persist PNG + sidecar; return the PNG path. Engine errors propagate."""
     return writer(backend.generate(request, on_progress), out_dir)
+
+
+def run_edit(
+    backend: Backend,
+    request: EditRequest,
+    out_dir: Path,
+    on_progress: ProgressCallback | None = None,
+    writer: Callable[[ImageResult, Path], Path] = write_result,
+) -> Path:
+    """Edit and persist PNG + sidecar (with source path and hash); return the PNG path."""
+    return writer(backend.edit(request, on_progress), out_dir)

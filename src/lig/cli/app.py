@@ -18,6 +18,7 @@ from rich.text import Text
 from lig import __version__
 from lig.backends.base import Backend, EngineError
 from lig.backends.registry import BACKENDS
+from lig.cli.edit import edit as edit_command
 from lig.cli.generate import generate as generate_command
 from lig.core import config as cfg
 from lig.core import doctor as diag
@@ -91,11 +92,7 @@ def _stub(name: str) -> None:
 app.command("generate")(handle_engine_errors(generate_command))
 
 
-@app.command()
-@handle_engine_errors
-def edit() -> None:
-    """Edit an existing image with a prompt."""
-    _stub("edit")
+app.command("edit")(handle_engine_errors(edit_command))
 
 
 @app.command()
