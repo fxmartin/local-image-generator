@@ -47,7 +47,7 @@
 ## MVP Summary
 
 ### MVP Criteria
-Phase 1 definition of done from `REQUIREMENTS.md` §6: fresh clone → README → 1024² PNG on the XPS in one documented command in ≤ 10 min; `generate`, `edit`, `seeds`, `bench`, `models` all work on the XPS; `docs/bench/xps13.md` names the winning engine; tests green in the offline GitLab container with the coverage gate met; README complete; `v0.1.0` tagged.
+Phase 1 definition of done from `REQUIREMENTS.md` §6: fresh clone → README → 768², 30-step PNG on the XPS in one documented command in ≤ 10 min (the local fallback; 1024² renders remotely, see Story 02.1-004); `generate`, `edit`, `seeds`, `bench`, `models` all work on the XPS; `docs/bench/xps13.md` names the winning engine; tests green in the offline GitLab container with the coverage gate met; README complete; `v0.1.0` tagged.
 
 ### MVP Scope
 Epics 01–05 in full, plus the Must Have NFR stories (NFR-PERF-001, NFR-SEC-002, NFR-ACC-001, NFR-INT-001, NFR-INF-001, NFR-INF-002). Phase 0 (Epic-02 Feature 02.1) runs first and gates the rest: if no engine reaches ≤ 600 s at 1024², the fallback in story 02.1-004 is enacted before Epic-04 starts.
@@ -117,6 +117,6 @@ Phase 2 starts at **06.1-001** (needs 02.2-002 on macOS) and ends at **06.3-002*
 | 2 | Config, doctor, CI, registry | 01.1-002, 01.3-001..003, 03.1-001, 03.2-001, 05.1-002, 05.1-003 |
 | 3 | Adapters, downloads, generate | 02.2-001..004, 03.1-002, 03.2-002, 03.2-003, 03.3-001, 04.1-001, 04.1-002 |
 | 4 | Remaining commands, README, acceptance | 04.2-001, 04.3-001, 04.3-002, 04.4-001, 05.1-001, 05.1-004 |
-| 5–6 | Remote serving | Epic-06 |
+| 5–6 | Remote serving: the XPS default renderer (Story 02.1-004); start as soon as Epic-04 lands | Epic-06 |
 | 7–8 | MLX | Epic-07 |
 | Backlog | Polish | Epic-08 |

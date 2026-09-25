@@ -84,7 +84,7 @@
 **Story Points**: 2
 
 **Acceptance Criteria**:
-- **Given** a fresh clone in a new directory **When** the README is followed **Then** `lig generate` yields a PNG with total time ≤ 600 s recorded in `docs/bench/xps13.md` under "Phase 1 acceptance".
+- **Given** a fresh clone in a new directory **When** the README is followed **Then** `lig generate` yields a 768², 30-step PNG (the local fallback from Story 02.1-004) with total time ≤ 600 s recorded in `docs/bench/xps13.md` under "Phase 1 acceptance".
 - **Given** the same session **When** `edit`, `seeds --count 4`, `bench` and `models list/verify` run **Then** each succeeds and its output path or table is pasted into the acceptance section.
 - **Given** all of the above **When** done **Then** `pyproject.toml` is `0.1.0`, `CHANGELOG.md` has the section, and tag `v0.1.0` is pushed.
 - **Given** any step fails **When** it does **Then** an issue is opened with the failing command and log, and the tag is not created.

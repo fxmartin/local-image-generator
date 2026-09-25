@@ -137,7 +137,7 @@ the XPS sd.cpp's documented cfg 6.0 doubled the time for no visible gain). Sizes
 
 | ID | Requirement | Acceptance |
 |---|---|---|
-| P0-1 | `lig generate PROMPT [--size WxH] [--steps N] [--seed S] [--engine E] [--out DIR]` produces a PNG. | Fresh clone + README steps → 1024² PNG in `outputs/` in ≤ 10 min wall-clock on the XPS 13 (140V iGPU, 30 GB RAM). |
+| P0-1 | `lig generate PROMPT [--size WxH] [--steps N] [--seed S] [--engine E] [--out DIR]` produces a PNG. | Fresh clone + README steps → 768², 30-step PNG in `outputs/` in ≤ 10 min wall-clock on the XPS 13 (140V iGPU, 30 GB RAM), the local fallback chosen in Story 02.1-004 (measured 398 s). Full 1024², 40-step images from the XPS render remotely (P1-2). |
 | P0-2 | `lig edit IMAGE PROMPT [...]` applies an instruction edit to an existing PNG. | Edited PNG produced; test uses a fake backend; manual check on XPS that a single-object recolor leaves the rest visibly intact at 1024². |
 | P0-3 | `lig seeds PROMPT --count N [--seed-start S]` renders N seeds and a contact sheet. | N PNGs + one `*_sheet.png` grid with seed labels; N ≤ 8 enforced. |
 | P0-4 | `lig bench [--engines a,b] [--size] [--steps]` times each installed engine on a fixed prompt/seed and writes `bench/<date>_<host>.json` + a table to stdout. | Records engine, build backend, size, steps, load time, per-step time, total, peak RSS; refuses to compare results from different hosts. |
@@ -184,8 +184,9 @@ the XPS sd.cpp's documented cfg 6.0 doubled the time for no visible gain). Sizes
   the same host; the sidecar holds everything needed to re-run.
 - **Errors.** Engine stderr is captured to `~/.local/state/lig/logs/`; the CLI
   shows the last 20 lines and the log path, never a raw traceback.
-- **Performance targets.** XPS 13: ≤ 10 min per 1024² image (hard), ≤ 5 min
-  (aspiration, drives the bake-off). M3 Max: ≤ 2 min per 1024² image via MLX.
+- **Performance targets.** XPS 13 local: ≤ 10 min per 768², 30-step image (hard;
+  measured 398 s). 1024², 40 steps takes 21 min on the XPS, so it renders
+  remotely by default (Story 02.1-004, `docs/bench/xps13.md`). M3 Max: ≤ 2 min per 1024² image via MLX.
   Remote overhead from the XPS: ≤ 10 s beyond the Mac's local time for a 1024² PNG.
 - **Platforms.** Linux x86_64 (Arch/omarchy) and macOS arm64. Never assume a
   platform; probe with `platform`/`uname`. No Windows.
@@ -218,7 +219,7 @@ dashboards.
 
 **Definition of done (Phase 1).**
 
-1. Fresh clone → README → 1024² PNG on the XPS in one documented command, ≤ 10 min.
+1. Fresh clone → README → 768², 30-step PNG on the XPS in one documented command, ≤ 10 min.
 2. `generate`, `edit`, `seeds`, `bench`, `models` all work on the XPS.
 3. `docs/bench/xps13.md` names the winning engine with numbers; config default
    matches.
@@ -234,6 +235,12 @@ dashboards.
 | **2 — Remote (P1-1..3, P1-5)** | sd.cpp Metal on the M3 Max, `lig serve`, `RemoteBackend`, idle TTL, tailnet defaults. | From the XPS, a remote 1024² image lands with correct metadata; overhead ≤ 10 s. | Phase 1; Tailscale between XPS and M3 Max. |
 | **3 — MLX (P1-4, P1-6, P1-7)** | mflux adapter, quantization choice, Mac bench, transparent output. | `docs/bench/m3max.md`; macOS default engine set. | Phase 2 (so the daemon can serve MLX). |
 | **4 — Polish (P2)** | Rewriter, queue, completions, `--json`. | Opportunistic. | — |
+
+**Amended 2026-09-25 (Story 02.1-004).** No XPS engine reaches 1024² in
+10 minutes (best: sd.cpp Vulkan, 21 min). The XPS default renderer becomes the
+M3 Max over the tailnet, so Phase 2 starts as soon as Epic-04 lands, ahead of
+the Phase 1 acceptance run. Locally the XPS uses sd.cpp Vulkan at 768², 30
+steps (398 s), which is the Phase 1 acceptance configuration.
 
 **Milestones.** M0 spike report · M1 first PNG from `lig` on XPS · M2 P0 complete
 · M3 remote image from XPS · M4 MLX default on Macs.
