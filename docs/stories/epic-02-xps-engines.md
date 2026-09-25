@@ -195,5 +195,5 @@
 | 3 | 02.2-004, 02.2-001, 02.2-002, 02.2-003 | 13 | Not started |
 
 ## Epic Progress
-- [x] 02.1-001 (3) · [x] 02.1-002 (2) · [ ] 02.1-003 (5) · [ ] 02.1-004 (2) · [ ] 02.2-001 (3) · [ ] 02.2-002 (5) · [ ] 02.2-003 (3) · [ ] 02.2-004 (2)
-- **Completed**: 5 / 25 points (02.1-001 done: sd.cpp works, 21 min at 1024² with guidance 1.0, edit failed on memory; 02.1-002 rejected on this hardware; see `docs/bench/xps13.md`)
+- [x] 02.1-001 (3) · [x] 02.1-002 (2) · [x] 02.1-003 (5) · [ ] 02.1-004 (2) · [ ] 02.2-001 (3) · [ ] 02.2-002 (5) · [ ] 02.2-003 (3) · [ ] 02.2-004 (2)
+- **Completed**: 10 / 25 points (02.1-001 done: sd.cpp works, 21 min at 1024² with guidance 1.0, edit failed on memory; 02.1-002 rejected on this hardware; 02.1-003 SYCL and torch XPU both rejected; see `docs/bench/xps13.md`)

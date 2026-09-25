@@ -257,9 +257,123 @@ against the 3.6 GB it needed.
 
 ### Consequence for Story 02.1-004
 
-ncnn drops out of the XPS default-engine decision. The decision is between
-stable-diffusion.cpp on Vulkan (Story 02.1-001) and the Intel-specific paths
-(Story 02.1-003).
+ncnn drops out of the XPS default-engine decision. The Intel-specific paths
+(Story 02.1-003, below) also fail, which leaves stable-diffusion.cpp on Vulkan
+as the only working XPS engine.
 
 The sd.cpp guidance 1.0 measurement above (21 min at 1024²) is the current
 baseline for that decision.
+
+## Intel-specific paths (Story 02.1-003): both rejected
+
+Time spent: about 1.5 hours of the story's one-day time box, most of it the
+SYCL build.
+
+| Path | Status | Reason |
+|---|---|---|
+| stable-diffusion.cpp, SYCL | **rejected** | Builds and finds the GPU, but the Intel driver reports under 1.3 GB of free device memory; the first transformer block needs 1.5 GB, so generation stops before step 1 |
+| diffusers on PyTorch XPU | **rejected, not run** | The BF16 model is 33.1 GB; the XPS has 30 GB of RAM shared with the GPU. The story rejects this path above 30 GB without further tuning |
+
+### stable-diffusion.cpp with SYCL
+
+#### Setup
+
+oneAPI and the Level Zero runtime were installed from Arch `extra`, which
+needs root (FX ran it):
+
+```sh
+sudo pacman -S --needed level-zero-loader intel-compute-runtime \
+  intel-oneapi-dpcpp-cpp intel-oneapi-mkl intel-oneapi-mkl-sycl
+```
+
+| Package | Version |
+|---|---|
+| `level-zero-loader` | 1.32.0-1 |
+| `intel-compute-runtime` | 26.31.39395.13-1 |
+| `intel-oneapi-dpcpp-cpp` | 2026.0.0_947-1 (icx/icpx 2026.0.0.20260331) |
+| `intel-oneapi-mkl` and `intel-oneapi-mkl-sycl` | 2026.0.0_908-1 |
+
+`intel-oneapi-mkl-sycl` is a separate package; without it CMake fails with
+`Target "ggml-sycl" links to: MKL::MKL_SYCL::BLAS but the target was not
+found`. After installing, `sycl-ls` lists the GPU:
+
+```
+[level_zero:gpu][level_zero:0] Intel(R) oneAPI Unified Runtime over Level-Zero V2, Intel(R) Arc(TM) Graphics 20.4.4 [1.17.39395]
+```
+
+#### Build
+
+Same pinned sd.cpp commit as the Vulkan build (`b167b94`), separate build
+directory:
+
+```sh
+source /opt/intel/oneapi/setvars.sh
+cd ~/.cache/lig/spike/sdcpp
+cmake -S . -B build-sycl -G Ninja -DSD_SYCL=ON -DGGML_SYCL_F16=ON \
+  -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=icx -DCMAKE_CXX_COMPILER=icpx
+cmake --build build-sycl -j6
+```
+
+Build time about 5 minutes; `sd-cli` sha256 `8f8208cc…0c0ef8`. The log shows
+`GGML_SYCL_F16: yes`, `GGML_SYCL_DNNL: yes`, `GGML_SYCL_GRAPH: yes`.
+
+#### Run
+
+The same command as the Vulkan guidance 1.0 run, with `build-sycl/bin/sd-cli`.
+At the start: `MemAvailable` 16.8 GB, `GPUReclaim` 5.4 GB.
+
+```
+[WARN ] model manager memory on SYCL0: reported free 1137.66 MB / total 29300.16 MB
+[WARN ] model manager cannot make enough memory available on SYCL0: need 1482.32 MB device / 1034.68 MB budget, available 1137.66 MB device
+[ERROR] qwen_image_2_1 segment 2/34 (qwen_image_2_1.transformer_blocks.0) failed during weight preparation
+[ERROR] image.cpp:900 - sampling for image 1/1 failed after 0.83s
+	Elapsed (wall clock) time (seconds): 23.36
+	Exit status: 1
+```
+
+sd.cpp retried once without prefix caching and failed the same way.
+
+#### What was tried
+
+| Attempt | Reported free | Result |
+|---|---|---|
+| Default | 1138 MB | Fails at transformer block 0 |
+| `--max-vram 12` (explicit 12 GB budget) | 1220 MB | Same: the budget rises, but sd.cpp still checks the driver's free figure |
+| `ZES_ENABLE_SYSMAN=1` | 907 MB | Same |
+| `ZES_ENABLE_SYSMAN=0` | 871 MB | Same |
+
+ggml-sycl reads free memory from the SYCL `ext_intel_free_memory` device
+query. On this Lunar Lake iGPU it returns about 1 GB while the device reports
+29.3 GB total and the system has about 17 GB available. The Vulkan backend on
+the same machine sees the real shared pool, which is why Vulkan works and SYCL
+does not. Getting past this means patching ggml-sycl or sd.cpp's model
+manager, which is outside a time-boxed spike.
+
+#### What would change the decision
+
+- An Intel compute-runtime or ggml-sycl release that reports the shared
+  memory pool correctly on Lunar Lake iGPUs.
+- An sd.cpp option to trust `--max-vram` over the driver's free figure.
+
+Either is a cheap retest: the build directory and weights stay in
+`~/.cache/lig/spike/`.
+
+### diffusers on PyTorch XPU
+
+Not attempted. The official BF16 checkpoint
+([`Qwen/Qwen-Image-2.1`](https://huggingface.co/Qwen/Qwen-Image-2.1)) is
+33.1 GB on disk: text encoder 17.5 GB, transformer 14.2 GB, VAE 1.4 GB. The
+XPS has 30 GB of RAM, and on this UMA iGPU the GPU draws from the same pool.
+Loading the pipeline as documented cannot fit, and the story says to reject
+this path above 30 GB without further tuning.
+
+What would change the decision: an official 8-bit or FP8 checkpoint, or
+diffusers quantization support on XPU (for example torchao) that brings the
+pipeline under about 20 GB.
+
+### Consequence for Story 02.1-004
+
+stable-diffusion.cpp on Vulkan is the only engine that produces images on the
+XPS. Its best measured time is 1248 s for 1024², 40 steps at guidance 1.0,
+about 2× over the 600 s P0-1 target. Story 02.1-004 picks the fallback: a
+smaller default size, fewer steps, or the XPS as a remote-only client.
