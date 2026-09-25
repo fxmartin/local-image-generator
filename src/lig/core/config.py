@@ -35,7 +35,12 @@ class SdcppSettings(BaseModel):
         return shlex.split(value) if isinstance(value, str) else value
 
 
+class NcnnSettings(BaseModel):
+    pass
+
+
 class EnginesSettings(BaseModel):
+    ncnn: NcnnSettings = NcnnSettings()
     sdcpp: SdcppSettings = SdcppSettings()
 
 
@@ -46,6 +51,8 @@ class Settings(BaseModel):
     output_dir: Path = Path("./outputs")
     models_dir: Path = Path(platformdirs.user_cache_dir("lig")) / "models"
     default_host: str | None = None
+    ncnn_binary: str | None = None
+    ncnn_model_dir: Path | None = None
     steps: int = 40
     size: str = "1024x1024"
     serve: ServeSettings = ServeSettings()
@@ -59,10 +66,10 @@ class Settings(BaseModel):
             raise ValueError(f"must be WIDTHxHEIGHT, both multiples of {SIZE_MULTIPLE}")
         return value
 
-    @field_validator("output_dir", "models_dir")
+    @field_validator("output_dir", "models_dir", "ncnn_model_dir")
     @classmethod
-    def _expand_user(cls, value: Path) -> Path:
-        return value.expanduser()
+    def _expand_user(cls, value: Path | None) -> Path | None:
+        return None if value is None else value.expanduser()
 
 
 @dataclass
@@ -211,6 +218,12 @@ CONFIG_TEMPLATE = """\
 
 # Remote `lig serve` host on the tailnet, used by the remote engine.
 # default_host = "macbook-pro-m3-max.tailac3c7a.ts.net:8765"
+
+# Path to the qwenimage-ncnn-vulkan binary (default: found on PATH).
+# ncnn_binary = "/opt/qwenimage-ncnn-vulkan/qwenimage-ncnn-vulkan"
+
+# The qwenimage21/ model folder used by the ncnn engine.
+# ncnn_model_dir = "~/.cache/lig/models/qwenimage21"
 
 # Extra sd-cli arguments for the sdcpp engine, appended verbatim
 # (env: LIG_ENGINES__SDCPP__EXTRA_ARGS, split shell-style).
