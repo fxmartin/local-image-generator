@@ -3,6 +3,20 @@ name = "local-image-generator"
 version = "0.1.0"
 description = "Local image generation CLI for Qwen-Image-2.1"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "FX Martin" }]
+keywords = ["image-generation", "qwen-image", "cli", "local-ai", "stable-diffusion-cpp", "mlx"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Graphics",
+]
 requires-python = ">=3.12"
 dependencies = [
     "typer>=0.12",
@@ -17,6 +31,10 @@ dependencies = [
 [project.optional-dependencies]
 serve = ["fastapi>=0.110", "uvicorn>=0.29"]
 mlx = ["mflux>=0.4; sys_platform == 'darwin' and platform_machine == 'arm64'"]
+
+[project.urls]
+Homepage = "https://github.com/fxmartin/local-image-generator"
+Repository = "http://home-lab.tailac3c7a.ts.net:8080/root/local-image-generator"
 
 [project.scripts]
 lig = "lig.cli.app:app"
