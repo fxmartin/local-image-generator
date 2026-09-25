@@ -50,6 +50,9 @@ env vars, e.g. `LIG_SERVE__BIND`.
   (`flag`, `env`, `file` or `default`) and the config file path used.
 - `lig config init` writes a commented `config.toml`; it refuses if one already exists.
 - Unknown keys in the file produce a warning naming the key and line; the run continues.
+- `engines.sdcpp.extra_args` (list of strings; env `LIG_ENGINES__SDCPP__EXTRA_ARGS`, split
+  shell-style) is appended verbatim to the `sd-cli` command line, e.g.
+  `["--model-args", "qwen_image_2_1_prefix_cache=false"]`.
 - `output_dir` and `models_dir` expand a leading `~` to your home directory.
 
 Model weights are cached under the platform cache dir (`~/.cache/lig/models` on Linux);

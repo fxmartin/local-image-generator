@@ -4,9 +4,11 @@ from typing import Any
 
 from lig.backends.base import Backend, EngineUnavailable
 from lig.backends.fake import FakeBackend
+from lig.backends.sdcpp import SdcppBackend
 
 BACKENDS: dict[str, type[Backend]] = {
     "fake": FakeBackend,
+    "sdcpp": SdcppBackend,
 }
 
 
