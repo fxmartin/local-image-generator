@@ -195,7 +195,7 @@ Engines are never run in CI; per-host measurements live in [`docs/bench/`](./doc
 
 CI (`.gitlab-ci.yml`) runs the same checks in an offline, root, Linux/arm64
 container: `uv sync --frozen` with `UV_OFFLINE=1`, from the project's uv cache on
-home-lab. After any `uv.lock` change, re-warm that cache before pushing (recipe in
+the CI host. After any `uv.lock` change, re-warm that cache before pushing (recipe in
 the `.gitlab-ci.yml` header), or the install step fails. Tests therefore:
 
 - cannot open sockets (an autouse guard in `tests/conftest.py` raises; opt out with
