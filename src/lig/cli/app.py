@@ -20,6 +20,7 @@ from lig.backends.base import Backend, EngineError
 from lig.backends.registry import BACKENDS
 from lig.core import config as cfg
 from lig.core import doctor as diag
+from lig.core import memory
 from lig.core.logs import report_engine_error
 from lig.models import cache, downloader
 from lig.models.registry import RegistryError, load_registry
@@ -69,6 +70,17 @@ def handle_engine_errors(func: Callable[..., Any]) -> Callable[..., Any]:
             raise typer.Exit(1) from error
 
     return wrapper
+
+
+def memory_preflight(estimate: int, available: int | None, force: bool) -> None:
+    """Exit 3 when the run would not fit in memory; with `--force`, warn and continue."""
+    try:
+        warning = memory.check(estimate, available, force)
+    except memory.MemoryRefusal as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(3) from exc
+    if warning:
+        typer.echo(f"warning: {warning}", err=True)
 
 
 def _stub(name: str) -> None:

@@ -2,6 +2,7 @@
 
 import os
 import platform
+import re
 import shutil
 import subprocess
 from collections.abc import Callable, Iterable, Mapping
@@ -65,13 +66,38 @@ def parse_meminfo(text: str) -> tuple[int | None, int | None]:
     return values.get("MemTotal"), values.get("MemAvailable")
 
 
+def parse_vm_stat(text: str) -> int | None:
+    """Reclaimable bytes from `vm_stat`: free + inactive + speculative pages."""
+    header = re.search(r"page size of (\d+) bytes", text)
+    if not header:
+        return None
+    pages = {
+        key: int(match.group(1))
+        for key in ("free", "inactive", "speculative")
+        if (match := re.search(rf"Pages {key}:\s+(\d+)", text))
+    }
+    if len(pages) != 3:
+        return None
+    return sum(pages.values()) * int(header.group(1))
+
+
+def _vm_stat_available() -> int | None:
+    try:
+        done = subprocess.run(
+            ["vm_stat"], capture_output=True, text=True, timeout=PROBE_TIMEOUT_S, check=False
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return parse_vm_stat(done.stdout) if done.returncode == 0 else None
+
+
 def probe_memory() -> tuple[int | None, int | None]:
     try:
         return parse_meminfo(Path("/proc/meminfo").read_text())
     except OSError:
         pass
-    try:  # macOS has no /proc; available RAM is not cheaply knowable there
-        return os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE"), None
+    try:  # macOS has no /proc: total from sysconf, available from vm_stat
+        return os.sysconf("SC_PHYS_PAGES") * os.sysconf("SC_PAGE_SIZE"), _vm_stat_available()
     except (ValueError, OSError, AttributeError):
         return None, None
 
