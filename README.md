@@ -33,7 +33,7 @@ Without the `serve` extra, `lig serve` exits with a one-line hint to install it.
 
 ```
 uv sync            # install runtime + dev dependencies
-uv run lig --help  # list subcommands (`edit`, `seeds`, `bench` are still stubs)
+uv run lig --help  # list subcommands (`edit`, `bench` are still stubs)
 uv run ruff check .
 uv run pytest      # coverage gate: 85 % on core, models, cli
 ```
@@ -103,6 +103,15 @@ TTY or `NO_COLOR` is set, it prints plain lines at most once per 10 % with no AN
 Exit codes: 0 ok, 1 engine error, 2 usage (bad size, unknown engine, invalid config), 3 memory
 pre-flight refusal (`--force` overrides), 4 engine unavailable (the message carries the reason;
 run `lig doctor`). A negative prompt does nothing at guidance 1, so `lig` warns and suggests `--guidance`.
+
+## Comparing seeds
+
+`lig seeds PROMPT [--count N] [--seed-start S]` (plus the `generate` flags except `--seed`) renders
+N images (default 4, max 8) one after another with consecutive seeds, so you can compare
+compositions before a long render. Each PNG and sidecar carries the same `batch_id`. Without
+`--seed-start` a random start is chosen and printed as `seed start: S`. If a seed fails, the images
+already written are kept, the error names the seed, and the exit code is 1. `--count` outside 1-8
+exits 2.
 
 ## Diagnostics
 
