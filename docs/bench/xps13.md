@@ -3,6 +3,37 @@
 Host `omarchy-xps13`: Dell XPS 13 9350, Intel Arc 140V iGPU (Lunar Lake), 30 GB
 shared RAM. Numbers here are recorded by hand; CI cannot run engines.
 
+## Decision (Story 02.1-004)
+
+Decided 2026-09-25 by FX. No engine reaches the P0-1 target of ≤ 600 s at
+1024², 40 steps on the XPS, so the PRD fallback applies:
+
+- **Default XPS renderer: remote.** Full-quality 1024², 40-step images from
+  the XPS are rendered on the M3 Max through `lig serve` (Epic-06, Phase 2),
+  which is scheduled straight after Epic-04.
+- **Local fallback on the XPS: stable-diffusion.cpp on Vulkan, 768², 30
+  steps, guidance 1.0.** Measured at 398 s, inside the 600 s target. This is
+  the offline mode and the Phase 1 acceptance configuration (Story 05.1-004).
+- **Rejected:** qwenimage-ncnn-vulkan (02.1-002), sd.cpp SYCL and diffusers
+  on PyTorch XPU (02.1-003).
+
+| Engine | Setting | Result | Total | vs 600 s |
+|---|---|---|---|---|
+| sd.cpp Vulkan | 1024², 40 steps, cfg 6.0 | pass | 2704 s | 4.5× over |
+| sd.cpp Vulkan | 1024², 40 steps, cfg 1.0 | pass | 1248 s | 2.1× over |
+| **sd.cpp Vulkan** | **768², 30 steps, cfg 1.0** | **pass** | **398 s** | **meets** |
+| qwenimage-ncnn-vulkan | 1024², 40 steps | fails to start (Vulkan budget) | — | rejected |
+| sd.cpp SYCL | 1024², 40 steps, cfg 1.0 | fails at block 0 (free-memory report) | — | rejected |
+| diffusers, PyTorch XPU | — | not run (33.1 GB > 30 GB RAM) | — | rejected |
+
+Why remote by default rather than local 768²: Qwen-Image-2.1's detail comes
+from 1024² and 40 steps; on the XPS that costs 21 minutes. The M3 Max is on
+the tailnet and idle most of the day. The local fallback keeps the XPS useful
+offline at about 6.6 minutes per image.
+
+Built-in defaults that follow from this (implemented in Story 04.1-001):
+Linux local runs default to 768×768, 30 steps; flags and config override.
+
 ## Environment
 
 | Item | Value |
@@ -113,6 +144,23 @@ out/t2i-cfg1.png`, and a freshly rebooted XPS (driver GPU cache empty,
 | Wall clock (timev) | 1248.78 s (≈ 21 min) |
 | Peak RSS (timev) | 479792 kB (see the UMA note above) |
 | Quality | Sharp photographic tabby cat; the sign reads `qwen2.1.cpp` correctly with no artifacts. Different composition from the cfg 6.0 image, as expected when guidance changes. |
+
+### Text-to-image, 768², 30 steps, `--cfg-scale 1.0` (local fallback)
+
+The configuration chosen as the XPS local fallback. Same command as the
+guidance 1.0 run, with `-H 768 -W 768 --steps 30 -o out/t2i-768-30.png`. At
+the start: `MemAvailable` 16.2 GB, `GPUReclaim` 6.1 GB.
+
+| Metric | Value |
+|---|---|
+| Status | **PASS**, PNG written (`out/t2i-768-30.png`, 768×768, sha256 `64f4ca3e…48ab`) |
+| Text conditioning | 3.33 s |
+| Sampling | 386.15 s (step 1 17.5 s; steps 10–30 ≈ 12.9 s/it) |
+| VAE decode | 7.83 s |
+| Total (`generate_image`) | 397.34 s |
+| Wall clock (timev) | 397.72 s (≈ 6.6 min) |
+| Peak RSS (timev) | 454920 kB (see the UMA note above) |
+| Quality | Sharp photographic cat; the sign reads `qwen2.1.cpp` correctly. At thumbnail size it is hard to tell apart from the 1024² image |
 
 ### Guidance comparison
 

@@ -27,6 +27,7 @@
 - **Given** the configured default engine is unavailable **When** run **Then** the message includes the `available()` reason and suggests `lig doctor`; exit code 4.
 - **Given** `--seed 42` twice with the fake backend **When** run **Then** the two PNGs are byte-identical.
 - **Given** `--negative TEXT` **When** the engine's guidance is 1.0 **Then** the CLI warns that the negative prompt has no effect at guidance 1 and suggests `--guidance`.
+- **Given** Linux and no `--size`/`--steps` flag or config value **When** `lig generate` runs locally **Then** it uses 768×768 and 30 steps, the XPS local fallback from Story 02.1-004; flags and config override it.
 
 **Technical Notes**: `lig/cli/generate.py` orchestrates; keep the orchestration in `lig/core/run.py` so `edit`, `seeds` and the daemon reuse it. Exit codes: 1 engine error, 2 usage/validation, 3 memory refusal, 4 engine unavailable.
 

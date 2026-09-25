@@ -111,11 +111,12 @@ only so the push mirror has somewhere to land.
 
 | Host | Engine (planned default) | Notes |
 |---|---|---|
-| `omarchy-xps13` (Arc 140V iGPU, 30 GB) | sd.cpp Vulkan (ncnn, SYCL, torch XPU rejected in Phase 0) | Vulkan works (sd.cpp, the only working engine). oneAPI + Level Zero installed, but SYCL is rejected: the driver under-reports free memory. |
+| `omarchy-xps13` (Arc 140V iGPU, 30 GB) | Remote on the M3 Max by default; local fallback sd.cpp Vulkan at 768², 30 steps (398 s). ncnn, SYCL, torch XPU rejected in Phase 0 | Vulkan works (sd.cpp, the only working engine). oneAPI + Level Zero installed, but SYCL is rejected: the driver under-reports free memory. |
 | `macbook-pro-m3-max` | sd.cpp Metal (Phase 2) → mflux MLX `-q 8` (Phase 3) | Serves the XPS via `lig serve` over the tailnet. |
 | `home-lab` (M1 Pro) | same as M3 Max | Always-on; secondary remote target. |
 
-Sampling defaults: 40 steps, 1024×1024, PNG, sizes validated to multiples of 32.
+Sampling defaults: 40 steps, 1024×1024, PNG, sizes validated to multiples of 32;
+Linux local runs default to 768×768, 30 steps (Story 02.1-004).
 Engine-specific guidance defaults live in the adapter (guidance 1.0 for all engines,
 Euler for sd.cpp; cfg 6.0 doubled sd.cpp's time on the XPS). Weights are never committed (`models/`, `*.gguf`,
 `*.safetensors` are gitignored).
