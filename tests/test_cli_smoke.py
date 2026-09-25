@@ -19,7 +19,7 @@ def test_help_lists_all_subcommands():
 STUBS = [
     n
     for n in SUBCOMMANDS
-    if n not in ("generate", "edit", "config", "models", "doctor", "serve", "bench")
+    if n not in ("generate", "edit", "seeds", "config", "models", "doctor", "serve", "bench")
 ]
 
 
