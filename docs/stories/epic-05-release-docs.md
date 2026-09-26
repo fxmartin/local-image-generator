@@ -17,6 +17,7 @@
 #### Stories
 
 ##### Story 05.1-001: README with install, engine setup and the five commands
+**Status**: Done
 **User Story**: As FX, I want a README covering `uv tool install`, engine build/install per platform (sd.cpp Vulkan on Arch, sd.cpp Metal on macOS, ncnn release binary), first-run `lig models pull`, and `generate`/`edit`/`seeds`/`bench`/`models` with real examples, so that a clean machine can be set up without me remembering anything.
 **Priority**: Must Have
 **Story Points**: 3
@@ -38,6 +39,7 @@
 **Risk Level**: Low
 
 ##### Story 05.1-002: Conventional commits, CHANGELOG and version alignment
+**Status**: Done
 **User Story**: As FX, I want commitlint configured for conventional commits, a `CHANGELOG.md` maintained per release, and a check that the git tag `vX.Y.Z` equals `pyproject.toml` version, so that releases carry reliable semver signal.
 **Priority**: Must Have
 **Story Points**: 2
@@ -59,6 +61,7 @@
 **Risk Level**: Low
 
 ##### Story 05.1-003: `uv tool install` packaging validated on a clean shell
+**Status**: Done
 **User Story**: As FX, I want `uv tool install .` (and later `uv tool install lig` from a git URL) to produce a working `lig` on PATH with the `serve` and `mlx` extras optional, so that installation is one command on every machine.
 **Priority**: Must Have
 **Story Points**: 2
@@ -79,6 +82,7 @@
 **Risk Level**: Low
 
 ##### Story 05.1-004: Phase 1 acceptance run on the XPS
+**Status**: Done
 **User Story**: As FX, I want a recorded acceptance run that follows the README on the XPS from a fresh clone and produces a 768², 30-step image (the local fallback from Story 02.1-004) in ≤ 10 min, plus edit, seeds, bench and models each exercised once, so that Phase 1 is closed on evidence and `v0.1.0` is tagged.
 **Priority**: Must Have
 **Story Points**: 2

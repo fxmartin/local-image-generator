@@ -17,6 +17,7 @@
 #### Stories
 
 ##### Story 01.1-001: Project scaffold with uv, Typer and quality tooling
+**Status**: Done
 **User Story**: As FX, I want a `uv`-managed Python 3.12+ package exposing a `lig` entry point with ruff, pytest and coverage configured so that every later story starts from a working, linted, tested baseline.
 **Priority**: Must Have
 **Story Points**: 3
@@ -37,6 +38,7 @@
 **Risk Level**: Low
 
 ##### Story 01.1-002: Offline CI pipeline on the local GitLab stack
+**Status**: Done
 **User Story**: As FX, I want a `.gitlab-ci.yml` that runs lint, tests and the coverage gate in the local Linux/arm64, root, no-network job container so that a passing suite on my Mac never masks a failure in CI.
 **Priority**: Must Have
 **Story Points**: 3
@@ -62,6 +64,7 @@
 #### Stories
 
 ##### Story 01.2-001: Request and result models with size validation
+**Status**: Done
 **User Story**: As FX, I want typed `GenerateRequest`, `EditRequest` and `ImageResult` models with validation so that every engine and command speaks one vocabulary and bad sizes are rejected before an engine is ever launched.
 **Priority**: Must Have
 **Story Points**: 3
@@ -83,6 +86,7 @@
 **Risk Level**: Low
 
 ##### Story 01.2-002: Backend protocol and FakeBackend
+**Status**: Done
 **User Story**: As FX, I want a `Backend` protocol with a `FakeBackend` implementation that emits a valid PNG so that commands, naming and metadata can be fully tested without weights, a GPU or the network.
 **Priority**: Must Have
 **Story Points**: 3
@@ -104,6 +108,7 @@
 **Risk Level**: Low
 
 ##### Story 01.2-003: Deterministic output naming with sidecar and PNG metadata
+**Status**: Done
 **User Story**: As FX, I want every output written as `YYYYMMDD-HHMMSS_<prompt-slug>_s<seed>.png` with a JSON sidecar and matching PNG text chunks so that six months later I can tell which prompt, seed and engine made any file.
 **Priority**: Must Have
 **Story Points**: 3
@@ -129,6 +134,7 @@
 #### Stories
 
 ##### Story 01.3-001: Layered configuration with provenance
+**Status**: Done
 **User Story**: As FX, I want configuration resolved as flag > `LIG_*` env > `~/.config/lig/config.toml` > defaults, with `lig config show` printing every effective value and where it came from, so that I never have to guess why a run used a given engine or size.
 **Priority**: Must Have
 **Story Points**: 5
@@ -150,6 +156,7 @@
 **Risk Level**: Medium
 
 ##### Story 01.3-002: `lig doctor` platform and engine diagnostics
+**Status**: Done
 **User Story**: As FX, I want `lig doctor` to print a table of every known engine with available/unavailable and a reason, plus platform facts (OS, arch, Vulkan ICD, Metal, oneAPI, RAM, models dir, disk free), so that a failed run is diagnosable in one command.
 **Priority**: Must Have
 **Story Points**: 3
@@ -171,6 +178,7 @@
 **Risk Level**: Low
 
 ##### Story 01.3-003: Engine log capture and friendly error surface
+**Status**: Done
 **User Story**: As FX, I want engine stdout/stderr captured to `~/.local/state/lig/logs/<timestamp>_<engine>.log` and, on failure, the last 20 lines plus the log path shown instead of a traceback, so that failures are readable and nothing is lost.
 **Priority**: Must Have
 **Story Points**: 2
