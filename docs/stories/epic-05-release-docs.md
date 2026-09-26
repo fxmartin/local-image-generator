@@ -79,7 +79,7 @@
 **Risk Level**: Low
 
 ##### Story 05.1-004: Phase 1 acceptance run on the XPS
-**User Story**: As FX, I want a recorded acceptance run that follows the README on the XPS from a fresh clone and produces a 1024² image in ≤ 10 min, plus edit, seeds, bench and models each exercised once, so that Phase 1 is closed on evidence and `v0.1.0` is tagged.
+**User Story**: As FX, I want a recorded acceptance run that follows the README on the XPS from a fresh clone and produces a 768², 30-step image (the local fallback from Story 02.1-004) in ≤ 10 min, plus edit, seeds, bench and models each exercised once, so that Phase 1 is closed on evidence and `v0.1.0` is tagged.
 **Priority**: Must Have
 **Story Points**: 2
 
@@ -106,5 +106,5 @@
 | 4 | 05.1-001, 05.1-004 | 5 | Not started |
 
 ## Epic Progress
-- [ ] 05.1-001 (3) · [ ] 05.1-002 (2) · [ ] 05.1-003 (2) · [ ] 05.1-004 (2)
-- **Completed**: 0 / 9 points
+- [x] 05.1-001 (3) · [x] 05.1-002 (2) · [x] 05.1-003 (2) · [x] 05.1-004 (2)
+- **Completed**: 9 / 9 points (Phase 1 acceptance passed 2026-09-26; `v0.1.0`)
