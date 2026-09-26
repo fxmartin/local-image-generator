@@ -3,6 +3,24 @@
 Sections are generated per release from conventional commits
 (`python scripts/changelog.py X.Y.Z --since vPREV --write`).
 
+## [0.2.0] - 2026-09-26
+
+### Features
+
+- **remote-serving:** remote overhead measured and (#06.3-002)
+- **remote-serving:** `remotebackend` and `--host` (#06.3-001)
+- **remote-serving:** tailnet-only bind by default (#06.2-005)
+- **remote-serving:** progress streaming over sse (#06.2-003)
+- **remote-serving:** idle-unload ttl (#06.2-004)
+- **remote-serving:** `post /v1/generate` and `post (#06.2-002)
+- **remote-serving:** stable-diffusion.cpp metal on the m3 (#06.1-001)
+- **remote-serving:** `lig serve` skeleton with health and (#06.2-001)
+
+### Bug fixes
+
+- **remote-serving:** use the serve port 7860 in config examples
+- **remote-serving:** correct four remote bench defects
+
 ## [0.1.0] - 2026-09-26
 
 ### Features
