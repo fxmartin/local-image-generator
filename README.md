@@ -226,25 +226,16 @@ left out). `--no-sheet` skips it.
 `lig-series` installs with `lig` (`uv tool install .`). `lig-series --help` works without `gemma`;
 only running a plan needs it.
 
-Fix a weak scene before spending GPU time. `--plan-only` runs the planning calls, prints the
-settings and one prompt per shot, writes `plan.json` and renders nothing; edit that file, then
-`--from-plan` renders it without calling `gemma`:
+Review before spending GPU time: `--plan-only` runs the global call and every per-shot call, prints
+the settings and one line per shot with its final prompt, writes `plan.json` to the series
+directory and starts no `lig` process. Edit the file, then render it with
+`lig-series --from-plan plan.json` (no `gemma` call; prompts are re-composed from the settings and
+scenes). After an interruption, `lig-series --from-plan plan.json --out SERIES_DIR --resume`
+renders only the shots without an image, reusing the series' seed.
 
-```sh
-lig-series "Create 10 photos black and white of a woman in Paris" --plan-only
-lig-series --from-plan series/20260101-120000_paris/plan.json
-```
-
-`--character NAME` saves the look, name and reference image the first time and reuses them in
-every later series, so the same person recurs:
-
-```sh
-lig-series "2 photos of her at a flea market" --character elara
-```
-
-Rendering time is real: a 1024x1024, 40-step shot takes about 10 min on the M3 Max, so 10 photos
-take about 100 min. Use `--size 768x768 --steps 30` for drafts, and never go below 30 steps:
-fewer gives ghosted, doubled subjects.
+Rendering time is real: a 1024x1024, 40-step shot takes about 10 min, so 10 photos take about
+100 min. Use `--size 768x768 --steps 30` for drafts, and never go below about 30 steps: fewer
+gives ghosted, doubled subjects.
 
 ## Troubleshooting
 
