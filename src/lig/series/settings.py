@@ -139,19 +139,27 @@ def plan_settings(
     max_shots: int = DEFAULT_MAX_SHOTS,
     style: str | None = None,
     setting: str | None = None,
+    character: Character | None = None,
     temperature: float = prompts.GLOBAL_TEMPERATURE,
 ) -> SeriesSettings:
     """Run the global call; retry once with the error appended, then save the raw answer.
 
     `count` (the `--count` flag) beats a number named in the request; either one is
-    enforced in code, so Gemma cannot drift from it.
+    enforced in code, so Gemma cannot drift from it. So is a saved `character`, which
+    replaces whatever look the model returns.
     """
     if count is None:
         count = requested_count(request)
     if count is not None and not 1 <= count <= max_shots:
         raise SeriesError(f"count {count} is outside 1 to --max-shots {max_shots}", EXIT_USAGE)
 
-    message = prompts.global_request(request, count=count, style=style, setting=setting)
+    message = prompts.global_request(
+        request,
+        count=count,
+        style=style,
+        setting=setting,
+        character=(character.name, character.look) if character else None,
+    )
 
     def ask(user_message: str) -> str:
         return client.complete(
@@ -164,9 +172,12 @@ def plan_settings(
     def parse(raw: str) -> SeriesSettings:
         settings = _parse(raw, count=count, max_shots=max_shots)
         # Fixed fields are enforced in code as well as told to the model.
-        return settings.model_copy(
-            update={k: v for k, v in (("style", style), ("setting", setting)) if v is not None}
-        )
+        fixed = {
+            k: v
+            for k, v in (("style", style), ("setting", setting), ("character", character))
+            if v is not None
+        }
+        return settings.model_copy(update=fixed)
 
     raw = ask(message)
     try:

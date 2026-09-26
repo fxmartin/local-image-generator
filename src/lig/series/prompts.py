@@ -29,6 +29,7 @@ def global_request(
     count: int | None = None,
     style: str | None = None,
     setting: str | None = None,
+    character: tuple[str, str] | None = None,
 ) -> str:
     """The user message for the global call; fixed fields are pinned in plain words."""
     lines = [request.strip()]
@@ -39,6 +40,12 @@ def global_request(
     if setting is not None:
         lines.append(
             f'The setting is fixed: "{setting}". Use it as "setting" and do not change it.'
+        )
+    if character is not None:
+        name, look = character
+        lines.append(
+            f'The character is fixed: name "{name}", look "{look}". '
+            'Use them as "character" and do not change them.'
         )
     return "\n".join(lines)
 

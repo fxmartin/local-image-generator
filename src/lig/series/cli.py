@@ -7,17 +7,34 @@ from functools import partial
 from pathlib import Path
 
 import typer
+from typer.core import TyperGroup
 
 from lig.core.output import slugify
-from lig.series import compose, prompts
+from lig.series import characters, compose, prompts
 from lig.series.gemma import GemmaClient, GemmaError
 from lig.series.runner import LigFlags, run_series
-from lig.series.settings import DEFAULT_MAX_SHOTS, plan_settings
+from lig.series.settings import DEFAULT_MAX_SHOTS, Character, SeriesError, plan_settings
 from lig.series.shots import plan_shots
 
 MAX_SEED = 2**32
 
-app = typer.Typer(add_completion=False, help=__doc__)
+
+class _RequestGroup(TyperGroup):
+    """`lig-series "request" ...` keeps working: anything that is not a subcommand is a run.
+
+    Routed before the group parses its own options, so `--help` shows the run flags and
+    options placed before the request reach `run` instead of being rejected by the group.
+    """
+
+    def parse_args(self, ctx: typer.Context, args: list[str]) -> list[str]:
+        if not args or args[0] not in self.commands:
+            args = ["run", *args]
+        return super().parse_args(ctx, args)
+
+
+app = typer.Typer(add_completion=False, help=__doc__, cls=_RequestGroup)
+characters_app = typer.Typer(help="List, show or delete saved characters.")
+app.add_typer(characters_app, name="characters")
 
 
 def _plan(client: GemmaClient, settings):
@@ -25,7 +42,7 @@ def _plan(client: GemmaClient, settings):
         yield compose.with_prompt(shot, settings)
 
 
-@app.command()
+@app.command("run", epilog="Manage saved characters with `lig-series characters --help`.")
 def main(
     request: str = typer.Argument(..., help='e.g. "Create 10 photos black and white of a woman".'),
     count: int | None = typer.Option(None, "--count", help="Number of photos."),
@@ -39,6 +56,9 @@ def main(
     host: str | None = typer.Option(None, "--host", help="lig --host."),
     negative: str | None = typer.Option(None, "--negative", help="lig --negative."),
     guidance: float | None = typer.Option(None, "--guidance", help="lig --guidance."),
+    character: str | None = typer.Option(
+        None, "--character", help="Save this series' character under NAME, or reuse it if saved."
+    ),
     out: Path | None = typer.Option(  # noqa: B008
         None, "--out", help="Series directory; default series/YYYYMMDD-HHMMSS_<slug>."
     ),
@@ -51,6 +71,11 @@ def main(
     series_dir = out or Path("series") / f"{datetime.now():%Y%m%d-%H%M%S}_{slugify(request)}"
     client = GemmaClient(binary=gemma, timeout=plan_timeout)
     try:
+        saved = characters.load(character) if character else None
+    except SeriesError as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(error.exit_code) from error
+    try:
         settings = plan_settings(
             client,
             request,
@@ -59,12 +84,18 @@ def main(
             max_shots=max_shots,
             style=style,
             setting=setting,
+            character=Character(name=saved.name, look=saved.look) if saved else None,
             temperature=prompts.GLOBAL_TEMPERATURE,
         )
     except GemmaError as error:
         typer.echo(f"error: {error}", err=True)
         raise typer.Exit(error.exit_code) from error
-    base_seed = seed if seed is not None else random.SystemRandom().randrange(MAX_SEED)
+    if seed is not None:
+        base_seed = seed
+    elif saved:
+        base_seed = saved.seed
+    else:
+        base_seed = random.SystemRandom().randrange(MAX_SEED)
     typer.echo(f"series of {settings.count} in {series_dir} (seed {base_seed})", err=True)
     flags = LigFlags(
         size=size, steps=steps, engine=engine, host=host, negative=negative, guidance=guidance
@@ -80,7 +111,59 @@ def main(
         gemma_model=client.status(),
         sheet=not no_sheet,
     )
+    if character and saved is None and result.exit_code == 0:
+        where = characters.save(
+            character,
+            settings.character,
+            style=settings.style,
+            seed=base_seed,
+            source_series=str(series_dir),
+        )
+        typer.echo(f"saved character {character} in {where}", err=True)
     raise typer.Exit(result.exit_code)
+
+
+@characters_app.command("list")
+def characters_list() -> None:
+    """Print the saved character names."""
+    for name in characters.list_names():
+        typer.echo(name)
+
+
+@characters_app.command("show")
+def characters_show(name: str = typer.Argument(...)) -> None:
+    """Print a saved character."""
+    try:
+        saved = characters.load(name)
+    except SeriesError as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(error.exit_code) from error
+    if saved is None:
+        typer.echo(f"error: no saved character {name!r}", err=True)
+        raise typer.Exit(1)
+    typer.echo(saved.model_dump_json(indent=2))
+    reference = characters.reference_path(name)
+    if reference:
+        typer.echo(f"reference: {reference}")
+
+
+@characters_app.command("rm")
+def characters_rm(
+    name: str = typer.Argument(...),
+    yes: bool = typer.Option(False, "--yes", help="Do not ask for confirmation."),
+) -> None:
+    """Delete a saved character."""
+    try:
+        exists = characters.load(name) is not None
+    except SeriesError as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(error.exit_code) from error
+    if not exists:
+        typer.echo(f"error: no saved character {name!r}", err=True)
+        raise typer.Exit(1)
+    if not yes:
+        typer.confirm(f"Delete character {name!r}?", abort=True)
+    characters.remove(name)
 
 
 if __name__ == "__main__":
