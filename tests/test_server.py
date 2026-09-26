@@ -413,7 +413,7 @@ def test_client_disconnect_cancels_engine_and_releases_lock(tmp_path):
 
 # --- idle-unload TTL (06.2-004) ---------------------------------------------------------------
 
-GEN = {"prompt": "a red cube", "steps": 2, "width": 64, "height": 64, "seed": 1}
+GEN = {"prompt": "a red cube", "steps": 2, "width": 256, "height": 256, "seed": 1}
 
 
 def _wait_for(predicate, timeout=10.0):

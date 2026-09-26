@@ -168,7 +168,13 @@ Exit codes: 0 ok; 1 on a sha256 mismatch, a failed or refused download (not enou
 
 ### Also: `lig doctor`, `lig config`, `lig serve`
 
-`lig doctor [--json]` reports platform facts and one row per engine.
+`lig doctor [--json]` reports platform facts, one row per engine and one per configured host
+(reachable/unreachable and the engine it serves, from `/v1/health`).
+`lig generate|edit ... --host NAME` runs the job on a `lig serve` listed under `[hosts]` in
+`config.toml` (`m3max = "http://100.x.y.z:7860"`), or on `default_host` when set; progress is
+streamed locally and the PNG and sidecar land in `./outputs` with `remote_host: NAME` and the
+server's engine details. An unreachable host exits 4 with its URL and the connection error after
+one retry. Remote runs use the 1024x1024, 40-step defaults, not the Linux local fallback.
 `lig config show|init` prints effective settings or writes a commented `config.toml`.
 Settings resolve as flag > `LIG_*` env > `~/.config/lig/config.toml` > defaults.
 `lig serve [--engine E] [--bind HOST:PORT] [--idle-ttl SECONDS] [--i-know]` starts a daemon wrapping one

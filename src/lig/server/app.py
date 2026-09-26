@@ -137,7 +137,7 @@ def create_app(
         if source_name is not None:
             # The server-side temp path is meaningless to the client.
             sidecar = sidecar.model_copy(update={"source_path": source_name})
-        metadata = RemoteMetadata(**sidecar.model_dump(), remote_host=host)
+        metadata = RemoteMetadata(**{**sidecar.model_dump(), "remote_host": host})
         return GenerateResponse(
             metadata=metadata, png_base64=base64.b64encode(result.png).decode("ascii")
         )
@@ -151,6 +151,7 @@ def create_app(
         return {
             "engine": backend.name,
             "engine_version": _engine_version(backend),
+            "capabilities": backend.capabilities().model_dump(),
             "weights": {
                 "installed": sum(a["status"] == "installed" for a in artifacts),
                 "total": len(artifacts),

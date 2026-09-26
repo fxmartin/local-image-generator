@@ -46,20 +46,21 @@ entry records its license and the engine build it was measured with (`pinned_eng
 transformer, VAE and ncnn files are under the Qwen Research License (research/evaluation use
 only), not Apache-2.0. The 2.1 VAE is not interchangeable with earlier Qwen-Image VAEs.
 
-Keys: `engine`, `output_dir`, `models_dir`, `default_host`, `ncnn_binary`, `ncnn_model_dir`, `steps`, `size`, `serve.bind`.
+Keys: `engine`, `output_dir`, `models_dir`, `default_host`, `hosts.NAME` (a `[hosts]` table of `NAME = "http://host:port"`), `ncnn_binary`, `ncnn_model_dir`, `steps`, `size`, `serve.bind`.
 The `ncnn` engine needs `ncnn_binary` (or `qwenimage-ncnn-vulkan` on `PATH`) and `ncnn_model_dir` (the `qwenimage21/` folder); it prints no per-step progress, so expect a spinner with elapsed time.
 
 ## Editing
 
-`lig edit IMAGE PROMPT [--size WxH] [--steps N] [--seed S] [--engine E] [--strength 0..1] [--out DIR] [--force]`
+`lig edit IMAGE PROMPT [--size WxH] [--steps N] [--seed S] [--engine E] [--strength 0..1] [--host NAME] [--out DIR] [--force]`
 applies an instruction edit ("make the teapot blue") to an existing image and writes a new PNG plus
 sidecar; the sidecar records the source's `source_path` and `source_sha256`. With no `--size`, the
 output is the source size rounded down to multiples of 32, and the command says so. Exit 4 if the
 engine cannot edit (e.g. the sdcpp `mmproj` weight is missing), 2 if IMAGE is not a readable image.
+With `--host` the image is uploaded to the server; the sidecar's `source_path` stays the local file.
 
 ## Generating
 
-`lig generate PROMPT [--size WxH] [--steps N] [--seed S] [--engine E] [--out DIR] [--negative TEXT] [--guidance G] [--force] [--quiet]`
+`lig generate PROMPT [--size WxH] [--steps N] [--seed S] [--engine E] [--host NAME] [--out DIR] [--negative TEXT] [--guidance G] [--force] [--quiet]`
 writes a PNG and a JSON sidecar to `./outputs` (or `--out` / `output_dir`) and prints the PNG path
 as its last line. Flags override `LIG_*` env, which overrides `config.toml`. On Linux, with no
 `--size`/`--steps` flag or config value, it uses 768x768 and 30 steps (the XPS local fallback).

@@ -336,7 +336,9 @@ def doctor(
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(1) from exc
     report = diag.build_report(
-        _platform_info(resolved.settings.models_dir), _engine_factories(resolved.settings)
+        _platform_info(resolved.settings.models_dir),
+        _engine_factories(resolved.settings),
+        hosts=resolved.settings.hosts,
     )
     if as_json:
         typer.echo(json.dumps(report, indent=2))
@@ -364,6 +366,13 @@ def doctor(
     console.print(facts)
     console.print()
     console.print(engines)
+    if report["hosts"]:
+        hosts = Table("host", "url", "status", "engine", box=None, pad_edge=False)
+        for row in report["hosts"]:
+            status = row["status"] + (f": {row['reason']}" if row["reason"] else "")
+            hosts.add_row(row["host"], row["url"], Text(status), row["engine"] or "-")
+        console.print()
+        console.print(hosts)
 
 
 config_app = typer.Typer(help="Show or initialise configuration.", no_args_is_help=True)

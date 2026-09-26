@@ -10,7 +10,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from lig.backends.base import Backend
+from lig.backends import remote
+from lig.backends.base import Backend, EngineUnavailable
 from lig.models.registry import Registry, load_registry
 
 VULKAN_ICD_DIRS = [Path("/usr/share/vulkan/icd.d"), Path("/etc/vulkan/icd.d")]
@@ -172,14 +173,28 @@ def _engine_row(
     }
 
 
+def probe_host(name: str, url: str) -> dict[str, Any]:
+    """One health request, no retry: doctor should answer fast about a dead host."""
+    row: dict[str, Any] = {"host": name, "url": url, "status": "unreachable", "engine": None}
+    try:
+        with remote.make_client() as client:
+            health = remote.fetch_health(client, url)
+    except EngineUnavailable as exc:
+        return {**row, "reason": str(exc)}
+    return {**row, "status": "reachable", "engine": health.get("engine"), "reason": ""}
+
+
 def build_report(
     info: PlatformInfo,
     engines: Mapping[str, Callable[[], Backend]],
     registry: Registry | None = None,
+    hosts: Mapping[str, str] | None = None,
+    host_probe: Callable[[str, str], dict[str, Any]] = probe_host,
 ) -> dict[str, Any]:
     models_dir = Path(info.models_dir)
     registry = registry or load_registry()
     return {
         "platform": asdict(info),
         "engines": [_engine_row(n, f, models_dir, registry) for n, f in sorted(engines.items())],
+        "hosts": [host_probe(n, u) for n, u in sorted((hosts or {}).items())],
     }

@@ -15,6 +15,8 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 ENV_PREFIX = "LIG_"
 ENV_NESTED_SEP = "__"
 SIZE_MULTIPLE = 32
+# Tables whose keys are user-chosen names, so they stay one value instead of flattening.
+MAPPING_KEYS = frozenset({"hosts"})
 
 
 class ConfigError(Exception):
@@ -54,6 +56,8 @@ class Settings(BaseModel):
     output_dir: Path = Path("./outputs")
     models_dir: Path = Path(platformdirs.user_cache_dir("lig")) / "models"
     default_host: str | None = None
+    # Remote `lig serve` daemons by name, e.g. m3max = "http://100.x.y.z:7860".
+    hosts: dict[str, str] = {}
     ncnn_binary: str | None = None
     ncnn_model_dir: Path | None = None
     steps: int = 40
@@ -67,6 +71,14 @@ class Settings(BaseModel):
         match = re.fullmatch(r"(\d+)x(\d+)", value)
         if not match or any(int(d) % SIZE_MULTIPLE or int(d) == 0 for d in match.groups()):
             raise ValueError(f"must be WIDTHxHEIGHT, both multiples of {SIZE_MULTIPLE}")
+        return value
+
+    @field_validator("hosts")
+    @classmethod
+    def _host_urls(cls, value: dict[str, str]) -> dict[str, str]:
+        for name, url in value.items():
+            if not re.match(r"https?://[^/\s]+", url):
+                raise ValueError(f"host '{name}' must be an http(s) URL, got '{url}'")
         return value
 
     @field_validator("output_dir", "models_dir", "ncnn_model_dir")
@@ -101,7 +113,7 @@ def _leaf_keys(model: type[BaseModel], prefix: str = "") -> list[str]:
 def _flatten(data: Mapping[str, Any], prefix: str = "") -> dict[str, Any]:
     flat: dict[str, Any] = {}
     for key, value in data.items():
-        if isinstance(value, dict):
+        if isinstance(value, dict) and f"{prefix}{key}" not in MAPPING_KEYS:
             flat.update(_flatten(value, f"{prefix}{key}."))
         else:
             flat[f"{prefix}{key}"] = value
@@ -219,8 +231,8 @@ CONFIG_TEMPLATE = """\
 # Where model weights are cached.
 # models_dir = "~/.cache/lig/models"
 
-# Remote `lig serve` host on the tailnet, used by the remote engine.
-# default_host = "macbook-pro-m3-max.tailac3c7a.ts.net:8765"
+# A name from [hosts] (or a URL / host:port). When set, jobs go to that `lig serve` by default.
+# default_host = "m3max"
 
 # Path to the qwenimage-ncnn-vulkan binary (default: found on PATH).
 # ncnn_binary = "/opt/qwenimage-ncnn-vulkan/qwenimage-ncnn-vulkan"
@@ -244,6 +256,10 @@ CONFIG_TEMPLATE = """\
 # Seconds a warm (in-process) engine stays loaded after the last job; 0 = unload after every job.
 # No effect on subprocess engines such as sdcpp.
 # idle_ttl = 600
+
+# Named `lig serve` daemons on the tailnet, selected with `--host NAME`.
+# [hosts]
+# m3max = "http://macbook-pro-m3-max.tailac3c7a.ts.net:8765"
 """
 
 
