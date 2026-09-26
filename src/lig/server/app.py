@@ -25,6 +25,7 @@ from lig.models.registry import Registry
 
 log = logging.getLogger(__name__)
 
+DEFAULT_IDLE_TTL_S = 600.0
 DEFAULT_MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 UPLOAD_CHUNK_BYTES = 1024 * 1024
 
@@ -80,12 +81,43 @@ def create_app(
     registry: Registry,
     models_dir: Path,
     max_upload_bytes: int = DEFAULT_MAX_UPLOAD_BYTES,
+    idle_ttl_s: float = DEFAULT_IDLE_TTL_S,
 ) -> FastAPI:
     api = FastAPI(title="lig serve", version=__version__)
     started = time.monotonic()
     host = platform.node() or "localhost"
     # One engine process at a time; a queue with states is Epic-08.
     engine_lock = threading.Lock()
+    warm = bool(getattr(backend, "supports_warm", False))
+    last_job_end = 0.0
+    idle_timer: threading.Timer | None = None
+
+    def unload_engine() -> None:
+        try:
+            backend.unload()  # type: ignore[attr-defined]
+        except Exception as exc:  # noqa: BLE001 - an unload failure must not fail the job
+            log.warning("engine unload failed: %s", exc)
+
+    def idle_expired() -> None:
+        with engine_lock:
+            # A job that ran meanwhile re-armed its own timer; this one is stale.
+            if time.monotonic() - last_job_end >= idle_ttl_s:
+                unload_engine()
+
+    def job_finished() -> None:
+        """Call with `engine_lock` held: unload now (ttl 0) or arm the idle timer."""
+        nonlocal last_job_end, idle_timer
+        if not warm:
+            return
+        last_job_end = time.monotonic()
+        if idle_timer is not None:
+            idle_timer.cancel()
+        if idle_ttl_s <= 0:
+            unload_engine()
+            return
+        idle_timer = threading.Timer(idle_ttl_s, idle_expired)
+        idle_timer.daemon = True
+        idle_timer.start()
 
     def respond(result: ImageResult, source_name: str | None = None) -> GenerateResponse:
         sidecar = sidecar_for(result, datetime.now(UTC))
@@ -110,7 +142,9 @@ def create_app(
                 "installed": sum(a["status"] == "installed" for a in artifacts),
                 "total": len(artifacts),
             },
-            "loaded": False,  # nothing is held in memory until the generate endpoint lands
+            "loaded": bool(getattr(backend, "loaded", False)) if warm else False,
+            # Subprocess engines exit after each job, so the idle TTL cannot apply to them.
+            "warm": "supported" if warm else "unsupported",
             "host": host,
             "lig_version": __version__,
             "uptime_s": round(time.monotonic() - started, 3),
@@ -128,6 +162,8 @@ def create_app(
             except EngineError as exc:
                 log.error("generate failed: %s", exc)
                 return _engine_failure(exc)
+            finally:
+                job_finished()
         return respond(result)
 
     @api.post("/v1/edit", response_model=GenerateResponse)
@@ -182,6 +218,8 @@ def create_app(
                 except EngineError as exc:
                     log.error("edit failed: %s", exc)
                     return _engine_failure(exc)
+                finally:
+                    job_finished()
         return respond(result, source_name=image.filename or "reference.png")
 
     return api

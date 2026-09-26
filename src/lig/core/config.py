@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import platformdirs
-from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 ENV_PREFIX = "LIG_"
 ENV_NESTED_SEP = "__"
@@ -23,6 +23,8 @@ class ConfigError(Exception):
 
 class ServeSettings(BaseModel):
     bind: str = "127.0.0.1:8765"
+    # Seconds a warm engine stays loaded after the last job; 0 unloads after every job.
+    idle_ttl: float = Field(default=600, ge=0)
 
 
 class SdcppSettings(BaseModel):
@@ -237,6 +239,9 @@ CONFIG_TEMPLATE = """\
 
 # [serve]
 # bind = "127.0.0.1:8765"
+# Seconds a warm (in-process) engine stays loaded after the last job; 0 = unload after every job.
+# No effect on subprocess engines such as sdcpp.
+# idle_ttl = 600
 """
 
 

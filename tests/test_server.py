@@ -296,3 +296,93 @@ def test_concurrent_requests_are_serialised(tmp_path):
         t.join()
     assert codes == [200, 200, 200]
     assert peak == 1
+
+
+# --- idle-unload TTL (06.2-004) ---------------------------------------------------------------
+
+GEN = {"prompt": "a red cube", "steps": 2, "width": 64, "height": 64, "seed": 1}
+
+
+def _wait_for(predicate, timeout=10.0):
+    import time
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(0.01)
+    return predicate()
+
+
+def _warm_client(tmp_path, ttl, backend=None):
+    backend = backend or FakeBackend(warm=True, cold_load_s=0.5)
+    return backend, TestClient(create_app(backend, load_registry(), tmp_path, idle_ttl_s=ttl))
+
+
+def test_second_job_within_ttl_skips_load(tmp_path):
+    _, client = _warm_client(tmp_path, ttl=600)
+    first = client.post("/v1/generate", json=GEN).json()["metadata"]
+    second = client.post("/v1/generate", json=GEN).json()["metadata"]
+    assert first["timings"]["load_s"] > 0
+    assert second["timings"]["load_s"] == 0
+    health = client.get("/v1/health").json()
+    assert health["loaded"] is True
+    assert health["warm"] == "supported"
+
+
+def test_idle_ttl_unloads_engine(tmp_path):
+    backend, client = _warm_client(tmp_path, ttl=0.05)
+    client.post("/v1/generate", json=GEN)
+    assert _wait_for(lambda: not backend.loaded)
+    assert client.get("/v1/health").json()["loaded"] is False
+    # The next job pays the load again.
+    assert client.post("/v1/generate", json=GEN).json()["metadata"]["timings"]["load_s"] > 0
+
+
+def test_ttl_zero_unloads_after_every_job(tmp_path):
+    backend, client = _warm_client(tmp_path, ttl=0)
+    client.post("/v1/generate", json=GEN)
+    assert backend.loaded is False
+    assert client.get("/v1/health").json()["loaded"] is False
+    assert backend.unloads == 1
+
+
+def test_job_arriving_before_ttl_defers_unload(tmp_path):
+    backend, client = _warm_client(tmp_path, ttl=600)
+    client.post("/v1/generate", json=GEN)
+    assert backend.loaded is True
+    assert backend.unloads == 0
+
+
+def test_engine_without_warm_support_reports_unsupported(client):
+    client.post("/v1/generate", json=GEN)
+    health = client.get("/v1/health").json()
+    assert health["warm"] == "unsupported"
+    assert health["loaded"] is False
+
+
+def test_ttl_is_noop_for_unsupported_engine(tmp_path):
+    api = create_app(FakeBackend(), load_registry(), tmp_path, idle_ttl_s=0)
+    client = TestClient(api)
+    assert client.post("/v1/generate", json=GEN).status_code == 200
+
+
+def test_failed_job_still_unloads_with_ttl_zero(tmp_path):
+    backend = FakeBackend(warm=True, fail=True)
+    _, client = _warm_client(tmp_path, ttl=0, backend=backend)
+    assert client.post("/v1/generate", json=GEN).status_code == 500
+    assert backend.loaded is False
+
+
+def test_cli_serve_passes_idle_ttl(isolated, monkeypatch):
+    import uvicorn
+
+    calls = {}
+    monkeypatch.setattr(uvicorn, "run", lambda api, **kw: calls.update(api=api, **kw))
+    result = runner.invoke(app, ["serve", "--engine", "fake", "--idle-ttl", "0"])
+    assert result.exit_code == 0, result.output
+
+
+def test_cli_serve_rejects_negative_ttl(isolated):
+    result = runner.invoke(app, ["serve", "--engine", "fake", "--idle-ttl", "-1"])
+    assert result.exit_code == 2
