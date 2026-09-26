@@ -213,3 +213,32 @@ def test_registered_and_config_key(tmp_path):
         "--x",
         "y z",
     ]
+
+
+def test_darwin_resolves_same_weights_and_is_available(models_dir, tmp_path, stub_bin_dir):
+    """macOS uses the Metal build of sd-cli with the same registry set as Linux."""
+    assert REGISTRY.set_for("sdcpp", "darwin") == REGISTRY.set_for("sdcpp", "linux")
+    backend = SdcppBackend(models_dir=models_dir, log_dir=tmp_path / "l", platform="darwin")
+    assert backend.available().ok
+    assert "darwin" in backend.capabilities().platforms
+
+
+def test_unavailable_when_binary_missing(models_dir, tmp_path, monkeypatch):
+    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
+    backend = SdcppBackend(models_dir=models_dir, log_dir=tmp_path / "l", platform="darwin")
+    result = backend.available()
+    assert not result.ok
+    assert "not found on PATH" in result.reason
+
+
+def test_unavailable_when_weights_not_installed(tmp_path, stub_bin_dir):
+    backend = SdcppBackend(models_dir=tmp_path / "none", log_dir=tmp_path / "l", platform="darwin")
+    result = backend.available()
+    assert not result.ok
+    assert "not installed" in result.reason
+
+
+def test_version_probe_falls_back_when_binary_missing(models_dir, tmp_path, monkeypatch):
+    monkeypatch.setenv("PATH", str(tmp_path / "empty"))
+    backend = SdcppBackend(models_dir=models_dir, log_dir=tmp_path / "l", platform="darwin")
+    assert backend._probe_version() == "unknown"
