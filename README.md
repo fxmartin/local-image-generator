@@ -70,8 +70,11 @@ cmake --build build -j
 install -Dm755 build/bin/sd-cli ~/.local/bin/sd-cli
 ```
 
-Expected `lig doctor` row: `sdcpp ... available`, and `Metal  yes` in the
-platform table. Metal is built here from the same pin but has not been benchmarked yet.
+Built with `cmake` and `ninja` from Homebrew, or from your nix-darwin toolchain if it provides
+them. Expected `lig doctor` row: `sdcpp ... available`, and `Metal  yes` in the platform table.
+Then `lig generate "a fox"` renders 1024x1024 by default. Record timings with
+`lig bench --engines sdcpp`; they land in `docs/bench/m3max.md`. sd.cpp's Metal path is known
+to be slow on large matrices, so correctness, not speed, is the bar for this engine.
 
 ### qwenimage-ncnn-vulkan (Linux, release binary)
 
