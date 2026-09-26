@@ -48,7 +48,7 @@ class Server:
         path = request.url.path
         if path == "/v1/health":
             return httpx.Response(
-                200, json={"engine": "sdcpp", "capabilities": CAPS, "host": "mac"}
+                200, json={"engine": "sdcpp", "capabilities": CAPS, "host": "mac", "build": "metal"}
             )
         if path == "/v1/generate":
             req = GenerateRequest(**json.loads(request.content))
@@ -129,6 +129,16 @@ def test_capabilities_come_from_health_and_are_cached(server):
     remote_backend.capabilities()
     remote_backend.available()
     assert [r.url.path for r in server.requests] == ["/v1/health"]
+
+
+def test_build_comes_from_server_health(server):
+    assert backend(server).build == "metal"
+
+
+def test_build_is_unknown_for_old_server():
+    transport = httpx.MockTransport(lambda r: httpx.Response(200, json={"engine": "x"}))
+    remote_backend = RemoteBackend("h", URL, client=httpx.Client(transport=transport))
+    assert remote_backend.build == "unknown"
 
 
 def test_capabilities_fallback_for_old_server(monkeypatch):
@@ -244,6 +254,7 @@ def test_server_health_reports_capabilities(tmp_path):
 
     body = TestClient(create_app(FakeBackend(), load_registry(), tmp_path)).get("/v1/health").json()
     assert body["capabilities"]["supports_edit"] is True
+    assert body["build"] == "none"  # the server reports its own build (fake has none)
 
 
 # --- config and host resolution ---

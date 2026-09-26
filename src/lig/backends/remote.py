@@ -96,6 +96,11 @@ class RemoteBackend:
             return Availability(ok=False, reason=str(exc))
         return Availability(ok=True)
 
+    @property
+    def build(self) -> str:
+        """The server's engine build (e.g. `metal`), from /v1/health; `unknown` if not reported."""
+        return str(self._get_health().get("build") or "unknown")
+
     def capabilities(self) -> Capabilities:
         raw = self._get_health().get("capabilities")
         return Capabilities.model_validate(raw) if raw else FALLBACK_CAPABILITIES

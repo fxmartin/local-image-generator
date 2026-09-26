@@ -16,6 +16,7 @@ class FakeRemote(FakeBackend):
     """A FakeBackend that answers like RemoteBackend: server host + configured name stamped."""
 
     name = "remote"
+    build = "metal"  # what the server's /v1/health reports
 
     def generate(self, request, on_progress):
         result = super().generate(request, on_progress)
@@ -46,6 +47,29 @@ def test_bench_host_records_client_and_server_host(tmp_path, monkeypatch):
     assert report.server_host == "macbook-pro-m3-max"
     assert report.client_host == report.host
     assert report.results[0].median_wall_s is not None
+    assert report.results[0].build_backend == "metal"
+
+
+def _fake_remote(monkeypatch):
+    monkeypatch.setattr(run, "make_backend", lambda name, settings, **kw: FakeRemote())
+
+
+def test_bench_host_uses_remote_defaults_not_the_linux_fallback(tmp_path, monkeypatch):
+    _fake_remote(monkeypatch)
+    result = runner.invoke(app, ["bench", "--host", "m3max"])
+    assert result.exit_code == 0, result.output
+    (path,) = (tmp_path / "bench").glob("*.json")
+    entry = bench.BenchReport.model_validate_json(path.read_text()).results[0]
+    assert (entry.width, entry.height, entry.steps) == (1024, 1024, 40)
+
+
+def test_remote_bench_does_not_overwrite_the_local_bench(tmp_path, monkeypatch):
+    runner.invoke(app, ["bench", "--engines", "fake", "--size", "256x256", "--steps", "1"])
+    _fake_remote(monkeypatch)
+    runner.invoke(app, ["bench", "--host", "m3max", "--size", "256x256", "--steps", "1"])
+    names = sorted(p.name for p in (tmp_path / "bench").glob("*.json"))
+    assert len(names) == 2
+    assert any("_via_macbook-pro-m3-max" in n for n in names)
 
 
 def test_local_bench_has_no_server_host(tmp_path):
@@ -117,11 +141,22 @@ def test_overhead_fails_above_limit_and_says_to_open_issue(tmp_path):
     assert "FAIL" in result.output and "open an issue" in result.output
 
 
-def test_overhead_falls_back_to_server_total_without_wall(tmp_path):
+def test_overhead_is_measured_within_the_remote_run(tmp_path):
+    # Measured 2026-09-26: the Mac rendered 1.2 s/step slower than in its separate local
+    # bench. That engine variance must not be reported as network overhead.
+    local = _report(tmp_path, "l.json", 615.17)
+    remote = _report(tmp_path, "r.json", 661.51, wall=661.81, server="m3")
+    result = runner.invoke(app, ["bench", "overhead", str(local), str(remote)])
+    assert result.exit_code == 0, result.output
+    assert "+0.30 s" in result.output and "PASS" in result.output
+    assert "+46.34 s" in result.output  # reported as engine variance, not overhead
+
+
+def test_overhead_needs_the_client_wall_clock(tmp_path):
     local = _report(tmp_path, "l.json", 100.0)
     remote = _report(tmp_path, "r.json", 101.0, server="m3")
-    outcome = bench.compute_overhead(bench.load_report(local), bench.load_report(remote), 10)
-    assert outcome.overhead_s == pytest.approx(1.0)
+    with pytest.raises(bench.BenchError, match="wall"):
+        bench.compute_overhead(bench.load_report(local), bench.load_report(remote), 10)
 
 
 def test_overhead_rejects_local_file_as_remote(tmp_path):

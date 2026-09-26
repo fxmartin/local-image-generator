@@ -29,6 +29,11 @@ def test_installs_are_offline_and_frozen():
     assert "uv sync --frozen" in ci["test"]["script"][0]
 
 
+def test_ci_installs_the_serve_extra_so_server_tests_run():
+    # Without it every FastAPI-dependent test is skipped (44 on 2026-09-26).
+    assert "--extra serve" in _ci()["test"]["script"][0]
+
+
 def test_job_image_is_the_digest_pinned_uv_git_image():
     assert _ci()["test"]["image"].startswith(UV_GIT_IMAGE)
 

@@ -13,7 +13,7 @@
 # latter skips the project, so hatchling never reaches the cache):
 #
 #   rsync -a --exclude .git --exclude .venv ./ home-lab:~/ci-warm/local-image-generator/
-#   ssh home-lab 'container run --rm -v local-ci-cd-cache-uv-root-local-image-generator:/cache/uv -v ~/ci-warm/local-image-generator:/src:ro -e UV_CACHE_DIR=/cache/uv -e UV_PYTHON_DOWNLOADS=never ghcr.io/astral-sh/uv@sha256:1b0697fa66367beef4ddc59d1ac6fac9cd8ab6bc09bab9951e4e0e479786cf0f sh -c "cp -r /src /work && cd /work && uv sync --frozen"'
+#   ssh home-lab 'container run --rm -v local-ci-cd-cache-uv-root-local-image-generator:/cache/uv -v ~/ci-warm/local-image-generator:/src:ro -e UV_CACHE_DIR=/cache/uv -e UV_PYTHON_DOWNLOADS=never ghcr.io/astral-sh/uv@sha256:1b0697fa66367beef4ddc59d1ac6fac9cd8ab6bc09bab9951e4e0e479786cf0f sh -c "cp -r /src /work && cd /work && uv sync --frozen --extra serve"'
 #
 # tests/test_ci_contract.py asserts this file keeps the contract.
 
@@ -39,7 +39,8 @@ test:
   stage: test
   image: 127.0.0.1:5001/local/uv-git@sha256:72794e132d0316ef8c8b3a76ec4c0ec828eb56329f945bd0f7b63d6c8dbaf17f
   script:
-    - uv sync --frozen
+    # --extra serve: without FastAPI/uvicorn every server test would be skipped.
+    - uv sync --frozen --extra serve
     - uv run ruff check .
     - uv run ruff format --check .
     # Coverage gate (fail_under = 85) lives in pyproject.toml; pytest exits non-zero below it.
