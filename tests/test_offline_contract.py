@@ -1,5 +1,6 @@
 import os
 import socket
+import sys
 
 import pytest
 
@@ -68,3 +69,17 @@ def test_non_root_marker_skips_with_explicit_reason_as_root():
     reason = requires_non_root.kwargs["reason"]
     assert "euid == 0" in reason
     assert requires_non_root.args[0] == (hasattr(os, "geteuid") and os.geteuid() == 0)
+
+
+def test_tests_never_read_the_developers_lig_config(tmp_path_factory):
+    # A real ~/.config/lig/config.toml (e.g. default_host = "m3max") made doctor tests
+    # reach for the network on a developer machine while CI stayed green.
+    from pathlib import Path
+
+    from lig.core import config as cfg
+
+    base = tmp_path_factory.getbasetemp()
+    assert Path(os.environ["XDG_CONFIG_HOME"]).is_relative_to(base)
+    if sys.platform.startswith("linux"):  # platformdirs ignores XDG_CONFIG_HOME on macOS
+        assert cfg.default_config_path().is_relative_to(base)
+    assert not [k for k in os.environ if k.startswith("LIG_")]

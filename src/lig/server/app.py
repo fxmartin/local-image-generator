@@ -61,7 +61,7 @@ def parse_bind(text: str) -> tuple[str, int]:
     """Split `HOST:PORT`; raise ValueError naming the bad value."""
     host, sep, port = text.rpartition(":")
     if not sep or not host or not port.isdigit() or not 0 < int(port) < 65536:
-        raise ValueError(f"invalid bind '{text}': expected HOST:PORT, e.g. 127.0.0.1:8765")
+        raise ValueError(f"invalid bind '{text}': expected HOST:PORT, e.g. 127.0.0.1:7860")
     return host, int(port)
 
 

@@ -54,6 +54,18 @@ def _check_address(address: object) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _isolated_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Never read the developer's lig config or LIG_* env: CI has neither, so results differ.
+
+    Modules that need a config set XDG_CONFIG_HOME again and write one there. On macOS
+    platformdirs ignores XDG_CONFIG_HOME, so this protects Linux (CI and the XPS) only.
+    """
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg-config"))
+    for key in [k for k in os.environ if k.startswith("LIG_")]:
+        monkeypatch.delenv(key)
+
+
+@pytest.fixture(autouse=True)
 def _socket_guard(request: pytest.FixtureRequest, monkeypatch: pytest.MonkeyPatch) -> None:
     """Allow loopback (local fixture servers), refuse everything else.
 
