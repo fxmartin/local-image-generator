@@ -19,12 +19,26 @@ def _fail(message: str, code: int) -> typer.Exit:
     return typer.Exit(code)
 
 
-def open_backend(ctx: typer.Context, settings: cfg.Settings) -> tuple[Backend, str]:
+HOST_HELP = "Run on this `lig serve` host (a [hosts] name); default: default_host from config."
+
+
+def engine_flag(engine: str | None, host: str | None) -> str | None:
+    """`--host` implies the remote engine and cannot be combined with another one."""
+    if host is None:
+        return engine
+    if engine not in (None, "remote"):
+        raise _fail(f"--host runs on the remote engine; drop --engine {engine}", EXIT_USAGE)
+    return "remote"
+
+
+def open_backend(
+    ctx: typer.Context, settings: cfg.Settings, host: str | None = None
+) -> tuple[Backend, str]:
     """Build the configured backend and confirm it can run; exit 2/4 otherwise."""
     engine_name = run.resolve_engine_name(settings)
     verbose = bool((ctx.obj or {}).get("verbose"))
     try:
-        backend = run.make_backend(engine_name, settings, verbose=verbose)
+        backend = run.make_backend(engine_name, settings, verbose=verbose, host=host)
         availability = backend.available()
     except run.UsageError as exc:
         raise _fail(str(exc), EXIT_USAGE) from exc
@@ -42,6 +56,7 @@ def generate(
     steps: int | None = typer.Option(None, "--steps", help="Sampling steps."),
     seed: int | None = typer.Option(None, "--seed", help="Seed; random (and recorded) if omitted."),
     engine: str | None = typer.Option(None, "--engine", help="Engine: auto, sdcpp, ncnn, fake."),
+    host: str | None = typer.Option(None, "--host", help=HOST_HELP),
     out: Path | None = typer.Option(None, "--out", help="Output directory."),  # noqa: B008
     negative: str | None = typer.Option(None, "--negative", help="Negative prompt."),
     guidance: float | None = typer.Option(None, "--guidance", help="Guidance scale."),
@@ -52,7 +67,7 @@ def generate(
     from lig.cli.app import memory_preflight  # late: app imports this module
 
     try:
-        resolved = cfg.load_settings({"engine": engine, "output_dir": out})
+        resolved = cfg.load_settings({"engine": engine_flag(engine, host), "output_dir": out})
         request = run.build_request(
             prompt,
             resolved,
@@ -70,7 +85,7 @@ def generate(
     if (warning := run.negative_prompt_warning(request)) is not None:
         typer.echo(f"warning: {warning}", err=True)
 
-    backend, engine_name = open_backend(ctx, settings)
+    backend, engine_name = open_backend(ctx, settings, host)
 
     try:
         figures = run.estimate_memory(load_registry(), engine_name, request)

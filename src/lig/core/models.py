@@ -72,3 +72,4 @@ class ImageResult(BaseModel):
     weights: list[WeightsUsed]
     timings: Timings
     host: str
+    remote_host: str | None = None  # the configured name of the `lig serve` that ran the job

@@ -35,6 +35,7 @@ class SidecarSchema(BaseModel):
     host: str
     lig_version: str
     created_at: str
+    remote_host: str | None = None
     source_path: str | None = None
     source_sha256: str | None = None
     batch_id: str | None = None  # shared by every image of one `lig seeds` run
@@ -66,6 +67,7 @@ def sidecar_for(
         host=result.host,
         lig_version=__version__,
         created_at=created_at.isoformat(),
+        remote_host=result.remote_host,
         source_path=str(req.reference_image) if source else None,
         source_sha256=req.reference_sha256 if source else None,
         batch_id=batch_id,

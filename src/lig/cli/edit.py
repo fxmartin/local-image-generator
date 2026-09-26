@@ -5,7 +5,7 @@ from pathlib import Path
 import typer
 
 from lig.backends.base import EngineUnavailable
-from lig.cli.generate import EXIT_UNAVAILABLE, EXIT_USAGE, _fail
+from lig.cli.generate import EXIT_UNAVAILABLE, EXIT_USAGE, HOST_HELP, _fail, engine_flag
 from lig.cli.progress import generation_progress
 from lig.core import config as cfg
 from lig.core import run
@@ -25,6 +25,7 @@ def edit(
     strength: float | None = typer.Option(
         None, "--strength", help="How far to move from the source, 0.0 to 1.0."
     ),
+    host: str | None = typer.Option(None, "--host", help=HOST_HELP),
     out: Path | None = typer.Option(None, "--out", help="Output directory."),  # noqa: B008
     force: bool = typer.Option(False, "--force", help="Run even if memory looks too tight."),
 ) -> None:
@@ -32,7 +33,7 @@ def edit(
     from lig.cli.app import memory_preflight  # late: app imports this module
 
     try:
-        resolved = cfg.load_settings({"engine": engine, "output_dir": out})
+        resolved = cfg.load_settings({"engine": engine_flag(engine, host), "output_dir": out})
         request = run.build_edit_request(
             prompt, image, resolved, size=size, steps=steps, seed=seed, strength=strength
         )
@@ -50,7 +51,7 @@ def edit(
     engine_name = run.resolve_engine_name(settings)
     verbose = bool((ctx.obj or {}).get("verbose"))
     try:
-        backend = run.make_backend(engine_name, settings, verbose=verbose)
+        backend = run.make_backend(engine_name, settings, verbose=verbose, host=host)
         availability = backend.available()
     except run.UsageError as exc:
         raise _fail(str(exc), EXIT_USAGE) from exc
@@ -73,7 +74,11 @@ def edit(
         memory_preflight(figures[0], figures[1], force)
 
     with generation_progress(
-        quiet=False, indeterminate=bool(getattr(backend, "progress_indeterminate", False))
+        quiet=False,
+        indeterminate=bool(
+            getattr(backend, "progress_indeterminate", False)
+            or getattr(backend, "edit_progress_indeterminate", False)
+        ),
     ) as on_progress:
         path = run.run_edit(backend, request, settings.output_dir, on_progress)
     typer.echo(str(path))

@@ -10,6 +10,7 @@ from PIL import Image, UnidentifiedImageError
 
 from lig.backends.base import Availability, Backend, EngineUnavailable, ProgressCallback
 from lig.backends.registry import BACKENDS, get_backend
+from lig.backends.remote import RemoteBackend
 from lig.core import config as cfg
 from lig.core import memory
 from lig.core.doctor import probe_memory
@@ -28,7 +29,7 @@ from lig.models.registry import Registry, RegistryError
 LINUX_LOCAL_SIZE = "768x768"
 LINUX_LOCAL_STEPS = 30
 # Engines the config accepts that this build cannot run yet.
-PLANNED_ENGINES = ("mlx", "remote")
+PLANNED_ENGINES = ("mlx",)
 
 
 class UsageError(ValueError):
@@ -63,9 +64,9 @@ def effective_size_and_steps(
     steps: int | None,
     platform: str = sys.platform,
 ) -> tuple[tuple[int, int], int]:
-    """Flag > config/env > Linux local fallback > global default."""
+    """Flag > config/env > Linux local fallback (not for remote) > global default."""
     settings, provenance = resolved.settings, resolved.provenance
-    linux_fallback = platform.startswith("linux")
+    linux_fallback = platform.startswith("linux") and resolve_engine_name(settings) != "remote"
     if size is None:
         size = (
             LINUX_LOCAL_SIZE
@@ -170,12 +171,35 @@ def negative_prompt_warning(request: GenerateRequest) -> str | None:
 
 
 def resolve_engine_name(settings: cfg.Settings) -> str:
-    """`auto` picks the local stable-diffusion.cpp engine until remote/MLX land."""
-    return "sdcpp" if settings.engine == "auto" else settings.engine
+    """`auto` is the remote host when `default_host` is set, else local stable-diffusion.cpp."""
+    if settings.engine != "auto":
+        return settings.engine
+    return "remote" if settings.default_host else "sdcpp"
 
 
-def make_backend(name: str, settings: cfg.Settings, *, verbose: bool = False) -> Backend:
+def resolve_host(settings: cfg.Settings, host: str | None) -> tuple[str, str]:
+    """(name, base URL) for a `[hosts]` name, or for a literal URL / `host:port`."""
+    host = host or settings.default_host
+    if not host:
+        raise EngineUnavailable(
+            "engine 'remote' needs a host: pass --host NAME or set default_host in config"
+        )
+    if host in settings.hosts:
+        return host, settings.hosts[host]
+    if "://" in host:
+        return host, host
+    if ":" in host:
+        return host, f"http://{host}"
+    known = ", ".join(sorted(settings.hosts)) or "none configured"
+    raise UsageError(f"unknown host '{host}'; configured hosts: {known}")
+
+
+def make_backend(
+    name: str, settings: cfg.Settings, *, verbose: bool = False, host: str | None = None
+) -> Backend:
     """Instantiate the named engine; unknown or not-yet-built engines raise."""
+    if name == "remote":
+        return RemoteBackend(*resolve_host(settings, host))
     if name in PLANNED_ENGINES:
         raise EngineUnavailable(f"engine '{name}' is not available in this build yet")
     if name not in BACKENDS:
