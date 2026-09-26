@@ -402,12 +402,33 @@ def config_init() -> None:
 
 @app.command()
 @handle_engine_errors
-def serve() -> None:
-    """Serve a local backend to other hosts (needs the serve extra)."""
+def serve(
+    engine: str | None = typer.Option(
+        None, "--engine", help="Local engine to serve; default: the configured engine."
+    ),
+    bind: str | None = typer.Option(
+        None, "--bind", help="HOST:PORT to listen on; default: serve.bind from config."
+    ),
+) -> None:
+    """Serve one local backend to other hosts (needs the serve extra)."""
     if any(importlib.util.find_spec(mod) is None for mod in ("fastapi", "uvicorn")):
         typer.echo(
             "lig serve needs the 'serve' extra: uv tool install 'local-image-generator[serve]'",
             err=True,
         )
-        raise typer.Exit(1)
-    _stub("serve")
+        raise typer.Exit(2)
+    import uvicorn
+
+    from lig.server.app import create_app, parse_bind
+
+    try:
+        settings = cfg.load_settings().settings
+        host, port = parse_bind(bind or settings.serve.bind)
+        backend = run.make_backend(engine or run.resolve_engine_name(settings), settings)
+        api = create_app(backend, load_registry(), cache.ensure_models_dir(settings.models_dir))
+    except (ValueError, cfg.ConfigError, RegistryError, OSError) as exc:
+        # run.UsageError is a ValueError, so a bad --engine or --bind lands here too.
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(2 if isinstance(exc, ValueError) else 1) from exc
+    typer.echo(f"serving {backend.name} on {host}:{port}")
+    uvicorn.run(api, host=host, port=port)

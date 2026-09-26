@@ -21,6 +21,9 @@ class FakeBackend:
         self._fail = fail
         self._stderr = stderr
 
+    def version(self) -> str:
+        return FAKE_VERSION
+
     def available(self) -> Availability:
         return Availability(ok=True)
 
