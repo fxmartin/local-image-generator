@@ -407,7 +407,13 @@ def serve(
         None, "--engine", help="Local engine to serve; default: the configured engine."
     ),
     bind: str | None = typer.Option(
-        None, "--bind", help="HOST:PORT to listen on; default: serve.bind from config."
+        None,
+        "--bind",
+        help="HOST:PORT to listen on; default: serve.bind from config, else the "
+        "Tailscale address on port 7860, else 127.0.0.1:7860.",
+    ),
+    i_know: bool = typer.Option(
+        False, "--i-know", help="Allow binding 0.0.0.0 without Tailscale (no auth!)."
     ),
     idle_ttl: float | None = typer.Option(
         None,
@@ -427,10 +433,16 @@ def serve(
     import uvicorn
 
     from lig.server.app import create_app, parse_bind
+    from lig.server.bind import BindRefused, resolve_bind
 
     try:
         settings = cfg.load_settings().settings
-        host, port = parse_bind(bind or settings.serve.bind)
+        decision = resolve_bind(
+            parse_bind(bind) if bind else None,
+            parse_bind(settings.serve.bind) if settings.serve.bind else None,
+            i_know=i_know,
+        )
+        host, port = decision.host, decision.port
         backend = run.make_backend(engine or run.resolve_engine_name(settings), settings)
         ttl = settings.serve.idle_ttl if idle_ttl is None else idle_ttl
         api = create_app(
@@ -439,9 +451,16 @@ def serve(
             cache.ensure_models_dir(settings.models_dir),
             idle_ttl_s=ttl,
         )
+    except BindRefused as exc:
+        Console(stderr=True).print(f"[bold red]error: {exc}[/]", soft_wrap=True)
+        raise typer.Exit(2) from exc
     except (ValueError, cfg.ConfigError, RegistryError, OSError) as exc:
         # run.UsageError is a ValueError, so a bad --engine or --bind lands here too.
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(2 if isinstance(exc, ValueError) else 1) from exc
+    if decision.warning:
+        Console(stderr=True).print(f"[bold red]warning: {decision.warning}[/]")
+    if decision.notice:
+        typer.echo(decision.notice)
     typer.echo(f"serving {backend.name} on {host}:{port}")
     uvicorn.run(api, host=host, port=port)

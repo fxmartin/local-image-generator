@@ -8,7 +8,6 @@ from typer.testing import CliRunner
 from lig import __version__
 from lig.backends.fake import FAKE_VERSION, FakeBackend
 from lig.cli.app import app
-from lig.core import config as cfg
 from lig.models.registry import load_registry
 
 pytest.importorskip("fastapi")
@@ -98,6 +97,7 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setenv("LIG_MODELS_DIR", str(tmp_path / "models"))
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
     monkeypatch.delenv("LIG_ENGINE", raising=False)
+    monkeypatch.setattr("lig.server.bind.probe_tailscale_ip", lambda: None)
 
 
 def test_cli_serve_runs_uvicorn_with_bind(isolated, monkeypatch):
@@ -117,8 +117,7 @@ def test_cli_serve_defaults_to_configured_bind(isolated, monkeypatch):
     calls = {}
     monkeypatch.setattr(uvicorn, "run", lambda api, **kw: calls.update(kw))
     assert runner.invoke(app, ["serve", "--engine", "fake"]).exit_code == 0
-    host, port = parse_bind(cfg.ServeSettings().bind)
-    assert (calls["host"], calls["port"]) == (host, port)
+    assert (calls["host"], calls["port"]) == ("127.0.0.1", 7860)
 
 
 def test_cli_serve_bad_bind_exits_2(isolated):

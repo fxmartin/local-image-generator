@@ -22,7 +22,8 @@ class ConfigError(Exception):
 
 
 class ServeSettings(BaseModel):
-    bind: str = "127.0.0.1:8765"
+    # None = tailnet address if Tailscale is up, else loopback (see lig.server.bind).
+    bind: str | None = None
     # Seconds a warm engine stays loaded after the last job; 0 unloads after every job.
     idle_ttl: float = Field(default=600, ge=0)
 
@@ -238,7 +239,8 @@ CONFIG_TEMPLATE = """\
 # size = "1024x1024"
 
 # [serve]
-# bind = "127.0.0.1:8765"
+# Unset: the Tailscale address on port 7860 if Tailscale is up, else 127.0.0.1:7860.
+# bind = "100.64.0.1:7860"
 # Seconds a warm (in-process) engine stays loaded after the last job; 0 = unload after every job.
 # No effect on subprocess engines such as sdcpp.
 # idle_ttl = 600
