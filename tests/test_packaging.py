@@ -34,14 +34,9 @@ def test_serve_without_extra_prints_install_hint(monkeypatch):
         lambda name, *a: None if name in {"fastapi", "uvicorn"} else real_find_spec(name, *a),
     )
     result = runner.invoke(app, ["serve"])
-    assert result.exit_code == 1
+    assert result.exit_code == 2
     assert "uv tool install" in result.output
     assert "[serve]" in result.output
-
-
-def test_serve_with_extra_installed_runs(monkeypatch):
-    monkeypatch.setattr(importlib.util, "find_spec", lambda name, *a: object())
-    assert runner.invoke(app, ["serve"]).exit_code == 0
 
 
 def test_serve_help_works_without_extra():

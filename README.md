@@ -8,7 +8,7 @@ remote engine served by another of your hosts over the tailnet.
 Inspired by Hao Yu's
 [Qwen-Image-2.1 Turned My Two Little Computers Into an Art Department](https://medium.com/generative-ai/qwen-image-2-1-turned-my-two-little-computers-into-an-art-department-no-cloud-required-29494e26f340).
 
-Status: pre-alpha. Local engines work; `lig serve` and MLX are later phases. Design docs:
+Status: pre-alpha. Local engines work; MLX and generating through `lig serve` are later phases. Design docs:
 [`REQUIREMENTS.md`](./REQUIREMENTS.md), [`docs/STORIES.md`](./docs/STORIES.md),
 [`CLAUDE.md`](./CLAUDE.md). Full flag and config reference: [`docs/reference.md`](./docs/reference.md).
 
@@ -168,6 +168,11 @@ Exit codes: 0 ok; 1 on a sha256 mismatch, a failed or refused download (not enou
 `lig doctor [--json]` reports platform facts and one row per engine.
 `lig config show|init` prints effective settings or writes a commented `config.toml`.
 Settings resolve as flag > `LIG_*` env > `~/.config/lig/config.toml` > defaults.
+`lig serve [--engine E] [--bind HOST:PORT]` starts a daemon (default bind `serve.bind`,
+`127.0.0.1:8765`) wrapping one local engine. It needs the `serve` extra (exit 2 with an install
+hint otherwise). `GET /v1/health` returns engine, engine version, weights, `loaded`, host,
+`lig` version and uptime; `GET /v1/models` returns the artifact state for that engine.
+Generation endpoints come with the remote client.
 
 ## Troubleshooting
 

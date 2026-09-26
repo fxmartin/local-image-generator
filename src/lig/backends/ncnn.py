@@ -73,6 +73,9 @@ class NcnnBackend:
     def _resolve_binary(self) -> str | None:
         return shutil.which(str(self._binary or BINARY_NAME))
 
+    def version(self) -> str:
+        return PINNED_RELEASE
+
     def available(self) -> Availability:
         if self._resolve_binary() is None:
             return Availability(
