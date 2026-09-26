@@ -211,8 +211,10 @@ lig-series "Create 10 photos black and white of a woman in Paris" --size 768x768
 Asks the local `gemma` for the series settings, then, for each shot in turn, plans it, composes
 the prompt and runs `lig generate PROMPT --seed S --out DIR`; the next `gemma` call waits for the
 render. Each PNG path is printed on stdout, progress on stderr as `[2/3 Title]`. Output goes to
-`series/YYYYMMDD-HHMMSS_<slug>/` (`--out` overrides) with a `series.json` recording the seed and
-shots. One random base seed is used for every shot unless you pass `--seed`. `--size`, `--steps`,
+`series/YYYYMMDD-HHMMSS_<slug>/` (`--out` overrides) with a `series.json` (rewritten after every shot) recording the
+request, the plan, the `gemma --status` model, the continuity mode, the seed, the `lig` version and,
+per shot, its status (`done`, `failed`, `skipped`), title, prompt, PNG and sidecar paths, `lig` exit
+code and wall time. One random base seed is used for every shot unless you pass `--seed`. `--size`, `--steps`,
 `--engine`, `--host`, `--negative` and `--guidance` pass through to `lig`; unset ones use lig's
 defaults. Also `--count`, `--max-shots`, `--style`, `--setting`, `--gemma`, `--plan-timeout`.
 A `lig` failure stops the series and exits with lig's code, keeping finished shots;

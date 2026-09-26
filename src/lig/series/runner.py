@@ -1,18 +1,27 @@
 """Story 09.2-001: loop over the shots, one `lig generate` per shot, sequentially."""
 
-import json
 import subprocess
 import sys
 import threading
+import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TextIO
 
+from lig import __version__
+from lig.series.manifest import (
+    CONTINUITY_PROMPT,
+    SERIES_FILE,
+    SeriesManifest,
+    ShotRecord,
+    sidecar_path,
+    write_manifest,
+)
 from lig.series.settings import SeriesError, SeriesSettings
 from lig.series.shots import Shot
 
-SERIES_FILE = "series.json"
+__all__ = ["SERIES_FILE"]
 EXIT_FAILED = 1
 # The interpreter running us, so a `uv tool` install needs no `lig` on PATH.
 LIG_ARGV = [sys.executable, "-c", "from lig.cli.app import app; app()"]
@@ -72,11 +81,6 @@ def render_with_lig(argv: list[str], label: str) -> tuple[int, str]:
     return code, lines[-1].strip() if lines else ""
 
 
-def _save(out_dir: Path, request: str, seed: int, settings: SeriesSettings, shots: list[dict]):
-    record = {"request": request, "seed": seed, "settings": settings.model_dump(), "shots": shots}
-    (out_dir / SERIES_FILE).write_text(json.dumps(record, indent=2))
-
-
 def run_series(
     settings: SeriesSettings,
     plan: Planner,
@@ -87,6 +91,7 @@ def run_series(
     render: Renderer = render_with_lig,
     keep_going: bool = False,
     request: str = "",
+    gemma_model: str | None = None,
 ) -> SeriesResult:
     """Plan and render shot by shot; the next `gemma` call waits for the render to finish.
 
@@ -94,9 +99,17 @@ def run_series(
     `keep_going` renders the rest and exits 1 at the end.
     """
     result = SeriesResult()
-    recorded: list[dict] = []
+    manifest = SeriesManifest(
+        request=request,
+        gemma_model=gemma_model,
+        plan=settings,
+        continuity=CONTINUITY_PROMPT,
+        seed=seed,
+        lig_version=__version__,
+    )
     out_dir.mkdir(parents=True, exist_ok=True)
-    _save(out_dir, request, seed, settings, recorded)
+    write_manifest(out_dir, manifest)
+    stopped = False
     shots = iter(plan(settings))
     index = 0
     while True:
@@ -107,23 +120,42 @@ def run_series(
         except SeriesError as error:
             print(f"error: {error}", file=sys.stderr)
             result.exit_code = error.exit_code
+            manifest.shots.append(
+                ShotRecord(index=index + 1, status="failed", exit_code=error.exit_code)
+            )
+            stopped = True
             break
         index += 1
         label = f"{index}/{settings.count} {shot.title}"
         argv = ["generate", shot.prompt, "--seed", str(seed), "--out", str(out_dir), *flags.argv()]
+        started = time.monotonic()
         code, path = render(argv, label)
-        entry = {"index": index, "title": shot.title, "scene": shot.scene, "prompt": shot.prompt}
+        entry = ShotRecord(
+            index=index,
+            status="done",
+            title=shot.title,
+            scene=shot.scene,
+            prompt=shot.prompt,
+            wall_seconds=round(time.monotonic() - started, 3),
+        )
         if code == 0 and path:
             result.paths.append(Path(path))
             print(path, flush=True)
-            entry["image"] = path
+            entry.png, entry.sidecar, entry.exit_code = path, sidecar_path(path), 0
         else:
             code = code or EXIT_FAILED
-            entry["exit_code"] = code
+            entry.status, entry.exit_code = "failed", code
             print(f"error: shot {label} failed (lig exit {code})", file=sys.stderr)
             result.exit_code = EXIT_FAILED if keep_going else code
-        recorded.append(entry)
-        _save(out_dir, request, seed, settings, recorded)
+        manifest.shots.append(entry)
+        write_manifest(out_dir, manifest)
         if code != 0 and not keep_going:
+            stopped = True
             break
+    if stopped:
+        manifest.shots.extend(
+            ShotRecord(index=n, status="skipped")
+            for n in range(len(manifest.shots) + 1, settings.count + 1)
+        )
+    write_manifest(out_dir, manifest)
     return result

@@ -76,6 +76,7 @@ def main(
         flags=flags,
         keep_going=keep_going,
         request=request,
+        gemma_model=client.status(),
     )
     raise typer.Exit(result.exit_code)
 
