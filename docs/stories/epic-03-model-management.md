@@ -17,6 +17,7 @@
 #### Stories
 
 ##### Story 03.1-001: Registry schema and loader
+**Status**: Done
 **User Story**: As FX, I want a YAML registry checked into the repo describing every weight artifact with repo, filename, sha256, size, engine, role and license, validated on load, so that adapters resolve weights by role instead of hardcoding paths.
 **Priority**: Must Have
 **Story Points**: 3
@@ -38,6 +39,7 @@
 **Risk Level**: Low
 
 ##### Story 03.1-002: Seed the registry with the Qwen-Image-2.1 sets
+**Status**: Done
 **User Story**: As FX, I want the registry populated with the sd.cpp Q4 set (leejet Q4 GGUF transformer, `Qwen3VL-8B-Instruct-Q4_K_M.gguf`, `qwen_image_2.1_vae_bf16.safetensors`, `mmproj-Qwen3VL-8B-Instruct-F16.gguf`) and the ncnn model bundle, with hashes taken from the Phase 0 downloads, so that `pull` works on day one.
 **Priority**: Must Have
 **Story Points**: 3
@@ -63,6 +65,7 @@
 #### Stories
 
 ##### Story 03.2-001: Cache directory and `lig models list`
+**Status**: Done
 **User Story**: As FX, I want weights cached under `$XDG_CACHE_HOME/lig/models` (override `LIG_MODELS_DIR` or config), and `lig models list` showing each artifact's installed/missing state, size, license and the total disk used and free, so that I know what I have before I pull anything.
 **Priority**: Must Have
 **Story Points**: 3
@@ -84,6 +87,7 @@
 **Risk Level**: Low
 
 ##### Story 03.2-002: `lig models pull` with resume and verification
+**Status**: Done
 **User Story**: As FX, I want `lig models pull [NAME | --engine E]` to download artifacts with HTTP range resume, show progress, verify sha256 on completion, refuse to overwrite a verified file and print the disk estimate before starting, so that a 20 GB download interrupted at 90 % does not start over and a corrupt file never reaches an engine.
 **Priority**: Must Have
 **Story Points**: 5
@@ -106,6 +110,7 @@
 **Risk Level**: Medium
 
 ##### Story 03.2-003: `lig models verify`, `rm` and `path`
+**Status**: Done
 **User Story**: As FX, I want `verify` to re-hash installed artifacts and exit non-zero on any mismatch, `rm` to delete an artifact after confirmation, and `path` to print an artifact's absolute path, so that I can audit, clean up and script around the cache.
 **Priority**: Must Have
 **Story Points**: 2
@@ -131,6 +136,7 @@
 #### Stories
 
 ##### Story 03.3-001: Pre-flight memory estimate and refusal
+**Status**: Done
 **User Story**: As FX, I want `lig` to estimate peak memory from the artifact sizes plus a per-engine overhead factor and refuse to start a run that exceeds available RAM, with `--force` to override, so that a 25 GB run on a 30 GB laptop with a browser open fails in 1 second instead of swapping for 10 minutes.
 **Priority**: Must Have
 **Story Points**: 3

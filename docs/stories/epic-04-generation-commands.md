@@ -17,6 +17,7 @@
 #### Stories
 
 ##### Story 04.1-001: `lig generate` end to end
+**Status**: Done
 **User Story**: As FX, I want `lig generate PROMPT [--size WxH] [--steps N] [--seed S] [--engine E] [--out DIR] [--negative TEXT]` to resolve config, run the memory pre-flight, select the backend, generate and write the PNG plus sidecar, so that a hero image for a post is one command.
 **Priority**: Must Have
 **Story Points**: 5
@@ -40,6 +41,7 @@
 **Risk Level**: Medium
 
 ##### Story 04.1-002: Rich progress output
+**Status**: Done
 **User Story**: As FX, I want a progress bar with step count, elapsed and estimated remaining time during generation, degrading to plain lines when not a TTY, so that a four-minute render does not look hung.
 **Priority**: Must Have
 **Story Points**: 2
@@ -65,6 +67,7 @@
 #### Stories
 
 ##### Story 04.2-001: `lig edit IMAGE PROMPT`
+**Status**: Done
 **User Story**: As FX, I want `lig edit IMAGE PROMPT [--size] [--steps] [--seed] [--engine] [--strength]` to apply an instruction edit to an existing PNG and write the result with the source image's path and hash in the sidecar, so that "make the teapot blue" keeps the rest of the picture and stays traceable.
 **Priority**: Must Have
 **Story Points**: 3
@@ -90,6 +93,7 @@
 #### Stories
 
 ##### Story 04.3-001: `lig seeds PROMPT --count N` sequential renders
+**Status**: Done
 **User Story**: As FX, I want `lig seeds PROMPT --count N [--seed-start S]` to render N images with consecutive seeds, so that I can compare compositions before spending four minutes on a 2K render.
 **Priority**: Must Have
 **Story Points**: 3
@@ -111,6 +115,7 @@
 **Risk Level**: Low
 
 ##### Story 04.3-002: Contact sheet with seed labels
+**Status**: Done
 **User Story**: As FX, I want `lig seeds` to also write a `<batch>_sheet.png` grid with each tile labelled by seed, so that picking a winner is one glance.
 **Priority**: Must Have
 **Story Points**: 3
@@ -136,6 +141,7 @@
 #### Stories
 
 ##### Story 04.4-001: `lig bench` engine comparison
+**Status**: Done
 **User Story**: As FX, I want `lig bench [--engines a,b] [--size] [--steps] [--runs N]` to run a fixed prompt and seed on each installed engine, print a table and write `bench/<date>_<host>.json`, so that "best performance" on each machine is a recorded measurement.
 **Priority**: Must Have
 **Story Points**: 5
