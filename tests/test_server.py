@@ -296,3 +296,115 @@ def test_concurrent_requests_are_serialised(tmp_path):
         t.join()
     assert codes == [200, 200, 200]
     assert peak == 1
+
+
+# --- POST /v1/generate?stream=1 (story 06.2-003) ---
+
+import asyncio  # noqa: E402
+import json  # noqa: E402
+
+STREAM_PAYLOAD = {"prompt": "x", "steps": 3, "width": 256, "height": 256}
+
+
+def parse_sse(text: str) -> list[tuple[str, dict]]:
+    events = []
+    for block in text.strip().split("\n\n"):
+        name, data = block.split("\n")
+        events.append((name.removeprefix("event: "), json.loads(data.removeprefix("data: "))))
+    return events
+
+
+def test_stream_emits_progress_per_step_then_result(client):
+    resp = client.post("/v1/generate?stream=1", json=STREAM_PAYLOAD)
+    assert resp.headers["content-type"].startswith("text/event-stream")
+    events = parse_sse(resp.text)
+    assert [name for name, _ in events] == ["progress"] * 3 + ["result"]
+    assert [(d["step"], d["total"]) for _, d in events[:3]] == [(1, 3), (2, 3), (3, 3)]
+    assert all(d["elapsed"] >= 0 for _, d in events[:3])
+    final = events[-1][1]
+    assert final["metadata"]["remote_host"]
+    assert base64.b64decode(final["png_b64"]).startswith(b"\x89PNG")
+
+
+def test_stream_engine_failure_ends_with_error_event(tmp_path):
+    api = TestClient(create_app(FakeBackend(fail=True, stderr="a\nb"), load_registry(), tmp_path))
+    events = parse_sse(api.post("/v1/generate?stream=1", json=STREAM_PAYLOAD).text)
+    assert [name for name, _ in events] == ["error"]
+    assert events[0][1]["message"] == "fake engine failed"
+    assert events[0][1]["log_tail"] == ["a", "b"]
+
+
+def test_stream_invalid_request_is_still_422(client):
+    resp = client.post("/v1/generate?stream=1", json={"prompt": "x", "width": 1000})
+    assert resp.status_code == 422
+
+
+def test_non_stream_path_unchanged(client):
+    assert "png_base64" in client.post("/v1/generate", json=STREAM_PAYLOAD).json()
+
+
+class _GatedBackend(FakeBackend):
+    """Emits step 1, then waits; reports whether the progress callback aborted the run."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.first_step = threading.Event()
+        self.proceed = threading.Event()
+        self.aborted = threading.Event()
+
+    def generate(self, request, on_progress):
+        on_progress(1, request.steps)
+        self.first_step.set()
+        assert self.proceed.wait(10)
+        try:
+            on_progress(2, request.steps)
+        except BaseException:
+            self.aborted.set()
+            raise
+        return super().generate(request, None)
+
+
+def test_client_disconnect_cancels_engine_and_releases_lock(tmp_path):
+    backend = _GatedBackend()
+    api = create_app(backend, load_registry(), tmp_path)
+    body = json.dumps(STREAM_PAYLOAD).encode()
+
+    async def drive() -> None:
+        sent = asyncio.Event()
+        first_chunk = asyncio.Event()
+
+        async def receive():
+            if not sent.is_set():
+                sent.set()
+                return {"type": "http.request", "body": body, "more_body": False}
+            await first_chunk.wait()
+            return {"type": "http.disconnect"}
+
+        async def send(message):
+            if message["type"] == "http.response.body" and message.get("body"):
+                first_chunk.set()
+
+        scope = {
+            "type": "http",
+            "asgi": {"version": "3.0"},
+            "http_version": "1.1",
+            "method": "POST",
+            "path": "/v1/generate",
+            "raw_path": b"/v1/generate",
+            "query_string": b"stream=1",
+            "headers": [(b"content-type", b"application/json")],
+            "server": ("test", 80),
+            "client": ("test", 1),
+            "scheme": "http",
+            "root_path": "",
+        }
+        await api(scope, receive, send)
+
+    asyncio.run(drive())
+    backend.proceed.set()
+    assert backend.aborted.wait(10)
+    follow_up = TestClient(api)
+    backend.proceed.set()  # the next job must not deadlock on the lock
+    assert follow_up.get("/v1/health").status_code == 200
+    resp = follow_up.post("/v1/generate", json={**STREAM_PAYLOAD, "steps": 1})
+    assert resp.status_code == 200

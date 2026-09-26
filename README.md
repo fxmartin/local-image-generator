@@ -181,6 +181,10 @@ hint otherwise). `GET /v1/health` returns engine, engine version, weights, `load
 fields, "remote_host"}, "png_base64": "..."}`. An invalid size is a 422 with the CLI's message;
 an engine failure is a 500 with `error`, `log_tail` (last 20 lines) and the server-side
 `log_path`; an upload over 50 MB is a 413. Jobs run one at a time; concurrent requests wait.
+`POST /v1/generate?stream=1` answers with server-sent events instead: one
+`progress {step, total, elapsed}` per step, then a final `result {metadata, png_b64}` or
+`error {message, log_tail}`. If the client disconnects mid-run the engine is cancelled and the
+lock is released.
 
 ## Troubleshooting
 
