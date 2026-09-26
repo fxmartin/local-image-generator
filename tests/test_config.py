@@ -177,3 +177,10 @@ def test_serve_idle_ttl_default_and_validation():
     assert cfg.Settings().serve.idle_ttl == 600
     with pytest.raises(ValueError):
         cfg.Settings(serve={"idle_ttl": -1})
+
+
+def test_template_host_example_uses_the_serve_default_port():
+    from lig.server.bind import DEFAULT_PORT
+
+    example = next(line for line in cfg.CONFIG_TEMPLATE.splitlines() if line.startswith("# m3max"))
+    assert example.endswith(f':{DEFAULT_PORT}"')

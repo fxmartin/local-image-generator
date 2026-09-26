@@ -259,7 +259,7 @@ CONFIG_TEMPLATE = """\
 
 # Named `lig serve` daemons on the tailnet, selected with `--host NAME`.
 # [hosts]
-# m3max = "http://macbook-pro-m3-max.tailac3c7a.ts.net:8765"
+# m3max = "http://macbook-pro-m3-max.tailac3c7a.ts.net:7860"
 """
 
 
