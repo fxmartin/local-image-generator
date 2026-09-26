@@ -235,16 +235,18 @@ lig-series "Create 10 photos black and white of a woman in Paris" --plan-only
 lig-series --from-plan series/20260101-120000_paris/plan.json
 ```
 
-`--character NAME` saves the look, name and reference image the first time and reuses them in
-every later series, so the same person recurs:
+`--character NAME` makes the character reusable across series. The first time (and only if the
+series finishes cleanly) it saves `character.json` (name, look, style, base seed, source series)
+under `~/.local/share/lig/characters/NAME/` (`$XDG_DATA_HOME/lig/characters/` when set; a
+`reference.png` is stored there too when a reference image exists). Later series with the same
+`--character` give the saved name and look to the global call as fixed input (they replace
+whatever the model returns) and reuse the saved seed unless `--seed` is passed. Manage them with
+`lig-series characters list`, `characters show NAME` and `characters rm NAME` (`--yes` skips the
+confirmation).
 
-```sh
-lig-series "2 photos of her at a flea market" --character elara
-```
-
-Rendering time is real: a 1024x1024, 40-step shot takes about 10 min on the M3 Max, so 10 photos
-take about 100 min. Use `--size 768x768 --steps 30` for drafts, and never go below 30 steps:
-fewer gives ghosted, doubled subjects.
+Rendering time is real: a 1024x1024, 40-step shot takes about 10 min, so 10 photos take about
+100 min. Use `--size 768x768 --steps 30` for drafts, and never go below about 30 steps: fewer
+gives ghosted, doubled subjects.
 
 ## Troubleshooting
 
