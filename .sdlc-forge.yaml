@@ -3,4 +3,4 @@
 # hostname carries no "gitlab" tell for auto-detection to key on. The
 # `github` remote is a push mirror (public README only), never the MR target.
 forge: gitlab
-gitlab_url: http://home-lab.tailac3c7a.ts.net:8080
+gitlab_url: http://gitlab.test
