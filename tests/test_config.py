@@ -171,3 +171,9 @@ def test_config_show_prints_brackets_literally(cfg_path, monkeypatch):
     result = runner.invoke(app, ["config", "show"])
     assert result.exit_code == 0
     assert "[bold]host" in result.output
+
+
+def test_serve_idle_ttl_default_and_validation():
+    assert cfg.Settings().serve.idle_ttl == 600
+    with pytest.raises(ValueError):
+        cfg.Settings(serve={"idle_ttl": -1})

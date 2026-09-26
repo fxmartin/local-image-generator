@@ -17,9 +17,25 @@ FAKE_WEIGHTS = WeightsUsed(name="fake-weights", sha256="0" * 64)
 class FakeBackend:
     name = "fake"
 
-    def __init__(self, fail: bool = False, stderr: str = "fake engine failure") -> None:
+    def __init__(
+        self,
+        fail: bool = False,
+        stderr: str = "fake engine failure",
+        warm: bool = False,
+        cold_load_s: float = 0.0,
+    ) -> None:
         self._fail = fail
         self._stderr = stderr
+        # Stand-in for an in-process engine (MLX) that can keep weights resident between jobs.
+        self.supports_warm = warm
+        self.loaded = False
+        self.unloads = 0
+        self._cold_load_s = cold_load_s
+
+    def unload(self) -> None:
+        if self.loaded:
+            self.loaded = False
+            self.unloads += 1
 
     def version(self) -> str:
         return FAKE_VERSION
@@ -44,6 +60,10 @@ class FakeBackend:
 
     def _run(self, request: GenerateRequest, on_progress: ProgressCallback | None) -> ImageResult:
         started = time.perf_counter()
+        load_s = 0.0
+        if self.supports_warm and not self.loaded:
+            load_s = self._cold_load_s
+            self.loaded = True
         if self._fail:
             raise EngineError("fake engine failed", self._stderr)
         for step in range(1, request.steps + 1):
@@ -57,7 +77,7 @@ class FakeBackend:
             engine=self.name,
             engine_version=FAKE_VERSION,
             weights=[FAKE_WEIGHTS],
-            timings=Timings(load_s=0.0, per_step_s=total / request.steps, total_s=total),
+            timings=Timings(load_s=load_s, per_step_s=total / request.steps, total_s=total),
             host=platform.node() or "localhost",
         )
 

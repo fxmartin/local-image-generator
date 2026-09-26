@@ -55,3 +55,6 @@ class Backend(Protocol):
     ) -> ImageResult: ...
 
     def edit(self, request: EditRequest, on_progress: ProgressCallback | None) -> ImageResult: ...
+
+    # Optional, in-process engines only (MLX, Epic-07): `supports_warm: bool`, `loaded: bool` and
+    # `unload()`. `lig serve` probes them with getattr; subprocess engines simply omit them.

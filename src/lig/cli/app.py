@@ -409,6 +409,13 @@ def serve(
     bind: str | None = typer.Option(
         None, "--bind", help="HOST:PORT to listen on; default: serve.bind from config."
     ),
+    idle_ttl: float | None = typer.Option(
+        None,
+        "--idle-ttl",
+        min=0,
+        help="Seconds a warm engine stays loaded when idle (0 = unload after every job); "
+        "default: serve.idle_ttl from config.",
+    ),
 ) -> None:
     """Serve one local backend to other hosts (needs the serve extra)."""
     if any(importlib.util.find_spec(mod) is None for mod in ("fastapi", "uvicorn")):
@@ -425,7 +432,13 @@ def serve(
         settings = cfg.load_settings().settings
         host, port = parse_bind(bind or settings.serve.bind)
         backend = run.make_backend(engine or run.resolve_engine_name(settings), settings)
-        api = create_app(backend, load_registry(), cache.ensure_models_dir(settings.models_dir))
+        ttl = settings.serve.idle_ttl if idle_ttl is None else idle_ttl
+        api = create_app(
+            backend,
+            load_registry(),
+            cache.ensure_models_dir(settings.models_dir),
+            idle_ttl_s=ttl,
+        )
     except (ValueError, cfg.ConfigError, RegistryError, OSError) as exc:
         # run.UsageError is a ValueError, so a bad --engine or --bind lands here too.
         typer.echo(f"error: {exc}", err=True)
