@@ -5,11 +5,9 @@ import subprocess
 import pytest
 from typer.testing import CliRunner
 
-pytest.importorskip("fastapi")
-
-from lig.cli.app import app  # noqa: E402
-from lig.server import bind as bindmod  # noqa: E402
-from lig.server.bind import BindRefused, resolve_bind  # noqa: E402
+from lig.cli.app import app
+from lig.server import bind as bindmod
+from lig.server.bind import BindRefused, resolve_bind
 
 runner = CliRunner()
 
@@ -96,6 +94,8 @@ def test_interface_probe_finds_tailscale_iface(monkeypatch):
 
 @pytest.fixture
 def env(tmp_path, monkeypatch):
+    pytest.importorskip("fastapi")
+    pytest.importorskip("uvicorn")
     monkeypatch.setenv("LIG_MODELS_DIR", str(tmp_path / "models"))
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
     monkeypatch.delenv("LIG_ENGINE", raising=False)
