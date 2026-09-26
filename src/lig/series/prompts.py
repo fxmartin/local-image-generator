@@ -51,3 +51,30 @@ def retry_request(original: str, raw_answer: str, error: str) -> str:
         f"Validation error: {error}\n"
         "Answer again with one corrected JSON object and nothing else."
     )
+
+
+# Adapted from the per-shot system prompt that passed the 2026-09-26 test on the M3 Max.
+SHOT_SYSTEM = """\
+You write one scene of a series of photographs. You receive the series settings as JSON, the position of this shot ("Shot i of N") and the titles and scenes of the shots already planned. Answer with one JSON object and nothing else, with exactly these keys:
+{"title": string, "scene": string}
+Rules:
+- "title" is a short title for this photo.
+- "scene" is 20 to 80 words giving the location within the setting, the action, the pose, the framing, the camera angle and the light.
+- Follow the arc: the scene fits where this shot falls between the first and the last.
+- Do not describe the character's appearance or the style: they are added elsewhere.
+- Do not repeat a location or a pose already used by an earlier shot.
+- Write in English, with no commentary and no code fences."""
+
+SHOT_TEMPERATURE = 0.7
+SHOT_MAX_TOKENS = 512
+
+
+def shot_request(
+    settings_json: str, index: int, total: int, previous: list[tuple[str, str]]
+) -> str:
+    """The user message for shot `index` (1-based) of `total`; `previous` is (title, scene) pairs."""
+    lines = [f"Series settings:\n{settings_json}", "", f"Shot {index} of {total}"]
+    if previous:
+        lines += ["", "Shots already planned:"]
+        lines += [f"{n}. {title}: {scene}" for n, (title, scene) in enumerate(previous, start=1)]
+    return "\n".join(lines)
