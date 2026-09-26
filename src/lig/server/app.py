@@ -21,6 +21,7 @@ from pydantic import BaseModel, ValidationError
 
 from lig import __version__
 from lig.backends.base import Backend, EngineError
+from lig.core.bench import build_backend
 from lig.core.logs import TAIL_LINES, tail_lines
 from lig.core.models import EditRequest, GenerateRequest, ImageResult
 from lig.core.output import SidecarSchema, sidecar_for
@@ -151,6 +152,7 @@ def create_app(
         return {
             "engine": backend.name,
             "engine_version": _engine_version(backend),
+            "build": build_backend(backend.name),
             "capabilities": backend.capabilities().model_dump(),
             "weights": {
                 "installed": sum(a["status"] == "installed" for a in artifacts),

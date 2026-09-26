@@ -48,7 +48,8 @@ def bench(
     if host is not None and engines not in (None, "remote"):
         raise _fail(f"--host runs on the remote engine; drop --engines {engines}", EXIT_USAGE)
     try:
-        resolved = cfg.load_settings()
+        # Remote runs use the global 1024², 40-step defaults, like `lig generate --host`.
+        resolved = cfg.load_settings({"engine": "remote"} if host is not None else None)
         request = run.build_request(
             core.BENCH_PROMPT, resolved, size=size, steps=steps, seed=core.BENCH_SEED
         )
