@@ -163,3 +163,15 @@ def test_corrupt_character_file_is_an_error():
     (folder / "character.json").write_text("{nope")
     assert runner.invoke(app, ["characters", "show", "bad"]).exit_code == 1
     assert runner.invoke(app, ["characters", "rm", "bad", "--yes"]).exit_code == 1
+
+
+def test_top_level_help_is_the_run_help_and_points_at_characters():
+    help_text = runner.invoke(app, ["--help"], terminal_width=200).output
+    assert "--character" in help_text
+    assert "lig-series characters" in help_text
+
+
+def test_options_before_the_request_still_run(tmp_path):
+    result = runner.invoke(app, ["--count", "1", "--gemma", "/nonexistent/gemma", "a woman"])
+    assert "No such option" not in result.output
+    assert result.exit_code != 0

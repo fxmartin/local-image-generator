@@ -20,12 +20,16 @@ MAX_SEED = 2**32
 
 
 class _RequestGroup(TyperGroup):
-    """`lig-series "request" ...` keeps working: anything that is not a subcommand is a run."""
+    """`lig-series "request" ...` keeps working: anything that is not a subcommand is a run.
 
-    def resolve_command(self, ctx: typer.Context, args: list[str]):
-        if args and args[0] not in self.commands and args[0] not in ctx.help_option_names:
+    Routed before the group parses its own options, so `--help` shows the run flags and
+    options placed before the request reach `run` instead of being rejected by the group.
+    """
+
+    def parse_args(self, ctx: typer.Context, args: list[str]) -> list[str]:
+        if not args or args[0] not in self.commands:
             args = ["run", *args]
-        return super().resolve_command(ctx, args)
+        return super().parse_args(ctx, args)
 
 
 app = typer.Typer(add_completion=False, help=__doc__, cls=_RequestGroup)
@@ -38,7 +42,7 @@ def _plan(client: GemmaClient, settings):
         yield compose.with_prompt(shot, settings)
 
 
-@app.command("run")
+@app.command("run", epilog="Manage saved characters with `lig-series characters --help`.")
 def main(
     request: str = typer.Argument(..., help='e.g. "Create 10 photos black and white of a woman".'),
     count: int | None = typer.Option(None, "--count", help="Number of photos."),

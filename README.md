@@ -244,7 +244,7 @@ whatever the model returns) and reuse the saved seed unless `--seed` is passed. 
 `lig-series characters list`, `characters show NAME` and `characters rm NAME` (`--yes` skips the
 confirmation).
 
-Rendering time is real: a 1024x1024, 40-step shot takes about 10 min, so 10 photos take about
+Rendering time is real: a 1024x1024, 40-step shot takes about 10 min on the M3 Max, so 10 photos take about
 100 min. Use `--size 768x768 --steps 30` for drafts, and never go below about 30 steps: fewer
 gives ghosted, doubled subjects.
 
