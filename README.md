@@ -226,9 +226,12 @@ left out). `--no-sheet` skips it.
 `lig-series` installs with `lig` (`uv tool install .`). `lig-series --help` works without `gemma`;
 only running a plan needs it.
 
-Fix a weak scene before spending GPU time. `--plan-only` runs the planning calls, prints the
-settings and one prompt per shot, writes `plan.json` and renders nothing; edit that file, then
-`--from-plan` renders it without calling `gemma`:
+Review before spending GPU time: `--plan-only` runs the global call and every per-shot call, prints
+the settings and one line per shot with its final prompt, writes `plan.json` to the series
+directory and starts no `lig` process. Edit the file, then render it with
+`lig-series --from-plan plan.json` (no `gemma` call; prompts are re-composed from the settings and
+scenes). After an interruption, `lig-series --from-plan plan.json --out SERIES_DIR --resume`
+renders only the shots without an image, reusing the series' seed.
 
 ```sh
 lig-series "Create 10 photos black and white of a woman in Paris" --plan-only

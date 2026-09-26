@@ -94,12 +94,14 @@ def run_series(
     request: str = "",
     gemma_model: str | None = None,
     sheet: bool = True,
+    done: dict[int, ShotRecord] | None = None,
 ) -> SeriesResult:
     """Plan and render shot by shot; the next `gemma` call waits for the render to finish.
 
     A `lig` failure stops the series with lig's exit code (finished shots stay);
     `keep_going` renders the rest and exits 1 at the end. Two or more rendered shots get a
-    `sheet.png` (only the rendered ones) unless `sheet` is False.
+    `sheet.png` (only the rendered ones) unless `sheet` is False. `done` maps shot index to
+    an already-rendered record (resume): those shots are kept as they are and not re-rendered.
     """
     result = SeriesResult()
     manifest = SeriesManifest(
@@ -129,6 +131,10 @@ def run_series(
             stopped = True
             break
         index += 1
+        if done and index in done:
+            manifest.shots.append(done[index])
+            result.paths.append(Path(done[index].png or ""))
+            continue
         label = f"{index}/{settings.count} {shot.title}"
         argv = ["generate", shot.prompt, "--seed", str(seed), "--out", str(out_dir), *flags.argv()]
         started = time.monotonic()
