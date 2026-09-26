@@ -425,3 +425,52 @@ stable-diffusion.cpp on Vulkan is the only engine that produces images on the
 XPS. Its best measured time is 1248 s for 1024², 40 steps at guidance 1.0,
 about 2× over the 600 s P0-1 target. Story 02.1-004 picks the fallback: a
 smaller default size, fewer steps, or the XPS as a remote-only client.
+
+## Phase 1 acceptance (Story 05.1-004)
+
+**Status: PASS**, 2026-09-26 on `omarchy-xps13`, `lig` 0.1.0 at `main` `f77a8c9`.
+Every step follows the README from a fresh GitLab clone, with no `--force`.
+
+| Step (README command) | Result | Wall time | Output |
+|---|---|---|---|
+| `uv tool install .` | `lig 0.1.0` on PATH | seconds | — |
+| `lig generate "a fox" --engine fake` | pass | < 1 s | sanity-check gradient |
+| `lig models pull --engine sdcpp` | 4 files, 10.3 GB, sha256-verified | 7 min 6 s | `~/.cache/lig/models` |
+| `lig doctor` | `sdcpp   4 file(s), 10.3 GiB  available` | < 1 s | — |
+| `lig generate "a lovely cat holding a sign that says 'qwen'" --size 768x768 --steps 30 --seed 42` | pass | **353.5 s** | `…_s42.png`, sha256 `697772533e63…` |
+| `lig bench --engines sdcpp --size 768x768 --steps 30 --runs 1` | pass | **291.3 s** (load 12.0 s, 9.31 s/step) | `bench/2026-09-26_omarchy-xps13.json` |
+| `lig edit <cat>.png "make the cat orange" --strength 0.8` | pass | 453.4 s (load 43.4 s) | `…make-the-cat-orange…png`, sha256 `485fe3a44238…` |
+| `lig seeds "a lighthouse at dusk" --count 4 --seed-start 100 --size 512x512` | pass, seeds 100–103 + contact sheet | 582 s | `…_sheet.png`, sha256 `9c323a4ca41c…` |
+| `lig models list --engine sdcpp`, `lig models verify` | 4 installed, all `ok` | 5 s | — |
+
+P0-1 (≤ 600 s for the local 768², 30-step fallback): met by both `generate`
+(353.5 s) and `bench` (291.3 s). The bench image hash (`8875732d6f54`) was
+identical across two runs, so a fixed seed reproduces the image.
+
+Quality: the cat's sign reads `qwen` correctly; the edit turned the cat orange
+and left the sign, pose and background unchanged; the four lighthouse seeds are
+distinct compositions.
+
+### Setup notes
+
+- **Engine**: `sd-cli` was installed from the spike's build of the pinned commit
+  `b167b94` (`install -Dm755 … ~/.local/bin/sd-cli`) instead of rebuilding the
+  same commit. The README build needs `vulkan-headers spirv-headers shaderc`
+  from pacman; the spike built the headers into a local prefix instead.
+
+### Defects found and fixed during the run
+
+The first pass (00:39–08:24) surfaced five defects. All were fixed with tests,
+merged through CI, and the affected steps were rerun on the fixed build:
+
+| Issue | Defect | Fix |
+|---|---|---|
+| #51 | `lig doctor` showed 0 cached files after a pull (scanned a per-engine folder; weights are flat) | MR !34 |
+| #52 | Progress counted sd.cpp tensor-loading bars as steps (`397/397` on a 30-step run) | MR !34 |
+| #53 | Memory pre-flight refused `edit` and `seeds` after the first render: `MemAvailable` omits the `xe` driver's GPU page pool (`GPUReclaim`, 11–12 GB), which the next GPU allocation reuses (the pool fell 11.2 → 0.1 GB during a forced edit) | MR !35 |
+| #54 | `lig edit` showed no progress | MR !35 |
+| #55 | sd.cpp load time recorded as 0 s | MR !35 |
+
+Before the fixes, `edit` and `seeds` exited 3 and passed with `--force`
+(413 s and 617 s). The first `generate` attempt was also stopped by the Claude
+Code session's low-memory guard, not by `lig`.
