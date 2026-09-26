@@ -202,6 +202,26 @@ is unloaded and `health` shows `loaded: false`. `--idle-ttl 0` unloads after eve
 Subprocess engines (sd.cpp, ncnn) cannot stay warm: `health` reports `warm: "unsupported"` and
 the TTL is a no-op. Warm serving arrives with the MLX engine (Epic-07).
 
+### `lig-series`
+
+```sh
+lig-series "Create 10 photos black and white of a woman in Paris" --size 768x768 --steps 30
+```
+
+Asks the local `gemma` for the series settings, then, for each shot in turn, plans it, composes
+the prompt and runs `lig generate PROMPT --seed S --out DIR`; the next `gemma` call waits for the
+render. Each PNG path is printed on stdout, progress on stderr as `[2/3 Title]`. Output goes to
+`series/YYYYMMDD-HHMMSS_<slug>/` (`--out` overrides) with a `series.json` recording the seed and
+shots. One random base seed is used for every shot unless you pass `--seed`. `--size`, `--steps`,
+`--engine`, `--host`, `--negative` and `--guidance` pass through to `lig`; unset ones use lig's
+defaults. Also `--count`, `--max-shots`, `--style`, `--setting`, `--gemma`, `--plan-timeout`.
+A `lig` failure stops the series and exits with lig's code, keeping finished shots;
+`--keep-going` renders the rest and exits 1.
+
+Rendering time is real: a 1024x1024, 40-step shot takes about 10 min, so 10 photos take about
+100 min. Use `--size 768x768 --steps 30` for drafts, and never go below about 30 steps: fewer
+gives ghosted, doubled subjects.
+
 ## Troubleshooting
 
 - **Exit 3, "would not fit in memory".** The pre-flight estimate exceeds available RAM. Lower

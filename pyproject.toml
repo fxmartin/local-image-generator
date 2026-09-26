@@ -42,6 +42,7 @@ Repository = "http://home-lab.tailac3c7a.ts.net:8080/root/local-image-generator"
 
 [project.scripts]
 lig = "lig.cli.app:app"
+lig-series = "lig.series.cli:app"
 
 [dependency-groups]
 dev = ["pytest>=8", "pytest-cov>=5", "ruff>=0.5"]
