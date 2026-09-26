@@ -192,6 +192,15 @@ def test_progress_forwarded(backend):
     assert sorted(seen) == [(1, 4), (2, 4), (3, 4), (4, 4)]
 
 
+def test_load_time_is_time_to_first_sampling_step(backend, monkeypatch):
+    # The stub sleeps before printing its first progress line, like sd-cli loading weights.
+    monkeypatch.setenv("STUB_SLEEP", "0.5")
+    timings = backend.generate(GenerateRequest(prompt="x", steps=4), None).timings
+    assert timings.load_s >= 0.5
+    assert timings.total_s >= timings.load_s
+    assert timings.per_step_s == pytest.approx((timings.total_s - timings.load_s) / 4)
+
+
 def test_registered_and_config_key(tmp_path):
     from lig.backends.registry import BACKENDS
 

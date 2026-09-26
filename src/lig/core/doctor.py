@@ -64,7 +64,13 @@ def parse_meminfo(text: str) -> tuple[int | None, int | None]:
         parts = rest.split()
         if parts and parts[0].isdigit():
             values[key] = int(parts[0]) * 1024  # /proc/meminfo reports kB
-    return values.get("MemTotal"), values.get("MemAvailable")
+    available = values.get("MemAvailable")
+    if available is not None:
+        # Intel xe/i915 keep freed GPU buffers in a page pool that the next GPU
+        # allocation reuses; MemAvailable omits it, which made the memory pre-flight
+        # refuse every run after the first one on an iGPU (see docs/bench/xps13.md).
+        available += values.get("GPUReclaim", 0)
+    return values.get("MemTotal"), available
 
 
 def parse_vm_stat(text: str) -> int | None:

@@ -227,6 +227,15 @@ class SdcppBackend:
         if binary is None:
             raise EngineUnavailable(f"{self._binary} not found on PATH")
         started = time.perf_counter()
+        first_step_at: list[float] = []
+
+        def track(done: int, total: int) -> None:
+            # sd-cli has no load-time report; loading ends where sampling starts.
+            if not first_step_at:
+                first_step_at.append(time.perf_counter())
+            if on_progress is not None:
+                on_progress(done, total)
+
         with (
             tempfile.TemporaryDirectory(prefix="lig-sdcpp-") as tmp,
             EngineLog(ENGINE, verbose=self._verbose, log_dir=self._log_dir) as log,
@@ -235,7 +244,7 @@ class SdcppBackend:
             run_engine(
                 self._argv(binary, request, weights, output),
                 log=log,
-                on_progress=on_progress,
+                on_progress=track,
                 timeout=self._timeout,
                 output_path=output,
             )
@@ -243,13 +252,14 @@ class SdcppBackend:
                 raise EngineError("sd-cli exited 0 but wrote no image", log_path=log.path)
             png = output.read_bytes()
         total = time.perf_counter() - started
+        load = first_step_at[0] - started if first_step_at else 0.0
         return ImageResult(
             png=png,
             request=request,
             engine=ENGINE,
             engine_version=self.version(),
             weights=[WeightsUsed(name=a.name, sha256=a.sha256) for a in weights.values()],
-            # sd-cli does not report load time separately; per-step is a whole-run average.
-            timings=Timings(load_s=0.0, per_step_s=total / request.steps, total_s=total),
+            # Load time is measured to the first sampling step (0 if sd-cli showed none).
+            timings=Timings(load_s=load, per_step_s=(total - load) / request.steps, total_s=total),
             host=platform_module.node() or "localhost",
         )

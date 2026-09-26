@@ -6,6 +6,7 @@ import typer
 
 from lig.backends.base import EngineUnavailable
 from lig.cli.generate import EXIT_UNAVAILABLE, EXIT_USAGE, _fail
+from lig.cli.progress import generation_progress
 from lig.core import config as cfg
 from lig.core import run
 from lig.models.registry import RegistryError, load_registry
@@ -71,5 +72,8 @@ def edit(
     if figures is not None:
         memory_preflight(figures[0], figures[1], force)
 
-    path = run.run_edit(backend, request, settings.output_dir)
+    with generation_progress(
+        quiet=False, indeterminate=bool(getattr(backend, "progress_indeterminate", False))
+    ) as on_progress:
+        path = run.run_edit(backend, request, settings.output_dir, on_progress)
     typer.echo(str(path))

@@ -110,3 +110,10 @@ def test_default_edit_size_clamps_to_minimum(tmp_path):
     tiny = tmp_path / "tiny.png"
     Image.new("RGB", (100, 3000), "red").save(tiny)
     assert run.default_edit_size(tiny) == (256, 2976)
+
+
+def test_edit_shows_step_progress_and_prints_path_last(source):
+    result = runner.invoke(app, ["edit", str(source), "make it blue", "--engine", "fake"])
+    assert result.exit_code == 0, result.output
+    assert "step" in result.output and "\x1b" not in result.output
+    assert result.output.strip().splitlines()[-1].endswith(".png")
