@@ -105,7 +105,7 @@ def test_cli_serve_runs_uvicorn_with_bind(isolated, monkeypatch):
 
     calls = {}
     monkeypatch.setattr(uvicorn, "run", lambda api, **kw: calls.update(api=api, **kw))
-    result = runner.invoke(app, ["serve", "--engine", "fake", "--bind", "0.0.0.0:9000"])
+    result = runner.invoke(app, ["serve", "--engine", "fake", "--bind", "0.0.0.0:9000", "--i-know"])
     assert result.exit_code == 0, result.output
     assert (calls["host"], calls["port"]) == ("0.0.0.0", 9000)
     assert TestClient(calls["api"]).get("/v1/health").json()["engine"] == "fake"
