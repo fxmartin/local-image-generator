@@ -171,9 +171,11 @@ Exit codes: 0 ok; 1 on a sha256 mismatch, a failed or refused download (not enou
 `lig doctor [--json]` reports platform facts and one row per engine.
 `lig config show|init` prints effective settings or writes a commented `config.toml`.
 Settings resolve as flag > `LIG_*` env > `~/.config/lig/config.toml` > defaults.
-`lig serve [--engine E] [--bind HOST:PORT]` starts a daemon (default bind `serve.bind`,
-`127.0.0.1:8765`) wrapping one local engine. It needs the `serve` extra (exit 2 with an install
-hint otherwise). `GET /v1/health` returns engine, engine version, weights, `loaded`, host,
+`lig serve [--engine E] [--bind HOST:PORT] [--idle-ttl SECONDS] [--i-know]` starts a daemon wrapping one
+local engine. Without `--bind` (or `serve.bind`) it binds the host's Tailscale `100.x` address on port 7860
+and prints the URL; with Tailscale absent it binds `127.0.0.1:7860` and says how to expose it. The daemon
+has no auth, so `--bind 0.0.0.0:PORT` without Tailscale is refused with a red warning unless you add `--i-know`. It needs the `serve` extra (exit 2 with an install
+hint otherwise). `GET /v1/health` returns engine, engine version, weights, `loaded`, `warm`, host,
 `lig` version and uptime; `GET /v1/models` returns the artifact state for that engine.
 `POST /v1/generate` (JSON `GenerateRequest`) and `POST /v1/edit` (multipart: `image` file plus
 `prompt` and optional `width`, `height`, `steps`, `seed`, `guidance`, `negative_prompt`,
