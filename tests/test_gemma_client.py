@@ -86,3 +86,12 @@ def test_timeout_exits_1(stub_bin_dir, monkeypatch):
 def test_stub_records_argv_as_json(stub_bin_dir, stub_argv_file):
     GemmaClient().complete("s", "r", temperature=0.2, max_tokens=3)
     assert json.loads(stub_argv_file.read_text().splitlines()[0])[0] == "--system"
+
+
+def test_os_error_launching_is_a_gemma_error(stub_bin_dir, monkeypatch):
+    def boom(*args, **kwargs):
+        raise OSError("exec format error")
+
+    monkeypatch.setattr("lig.series.gemma.subprocess.run", boom)
+    with pytest.raises(GemmaError, match="could not run gemma: exec format error"):
+        GemmaClient().complete("s", "r", temperature=0.1, max_tokens=1)
