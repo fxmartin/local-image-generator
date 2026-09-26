@@ -171,7 +171,8 @@ def test_end_to_end_with_fake_engine(tmp_path, monkeypatch):
     )  # fmt: skip
     assert result.exit_code == 0, result.output
     pngs = sorted(out.glob("*.png"))
-    assert len(pngs) == 3
+    assert len(pngs) == 4  # 3 shots + sheet.png
+    assert (out / "sheet.png").is_file()
     paths = [line for line in result.stdout.splitlines() if line.endswith(".png")]
     assert len(paths) == 3
     assert all(Path(p).exists() for p in paths)

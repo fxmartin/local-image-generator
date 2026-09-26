@@ -219,6 +219,9 @@ code and wall time. One random base seed is used for every shot unless you pass 
 defaults. Also `--count`, `--max-shots`, `--style`, `--setting`, `--gemma`, `--plan-timeout`.
 A `lig` failure stops the series and exits with lig's code, keeping finished shots;
 `--keep-going` renders the rest and exits 1.
+With two or more rendered shots the series ends with `sheet.png` in the series directory: a
+near-square grid of 384 px tiles, each labelled with its shot number and title (failed shots are
+left out). `--no-sheet` skips it.
 
 Rendering time is real: a 1024x1024, 40-step shot takes about 10 min, so 10 photos take about
 100 min. Use `--size 768x768 --steps 30` for drafts, and never go below about 30 steps: fewer
