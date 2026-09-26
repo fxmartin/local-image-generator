@@ -135,7 +135,7 @@ def test_series_json_records_seed_and_shots(tmp_path):
     )  # fmt: skip
     data = json.loads((tmp_path / "series.json").read_text())
     assert data["seed"] == 99
-    assert [s["image"] for s in data["shots"]] == ["/out/1.png", "/out/2.png"]
+    assert [s["png"] for s in data["shots"]] == ["/out/1.png", "/out/2.png"]
 
 
 def test_lig_argv_runs_the_current_interpreter():
@@ -202,3 +202,103 @@ def test_missing_gemma_exits_4(tmp_path):
 @pytest.mark.parametrize("flag", ["--keep-going"])
 def test_help_lists_flags(flag):
     assert flag in runner.invoke(app, ["--help"], terminal_width=200).output
+
+
+# --- Story 09.2-002: series.json manifest -----------------------------------------------------
+
+
+def test_manifest_validates_and_has_every_field(tmp_path):
+    from lig import __version__
+    from lig.series.manifest import read_manifest
+
+    run_series(
+        _settings(2), FakePlanner([]), out_dir=tmp_path, seed=9, flags=LigFlags(),
+        render=RecordingLig([]), request="two photos", gemma_model="gemma-4b",
+    )  # fmt: skip
+    manifest = read_manifest(tmp_path)
+    assert manifest.request == "two photos"
+    assert manifest.gemma_model == "gemma-4b"
+    assert manifest.plan == _settings(2)
+    assert (manifest.continuity, manifest.seed, manifest.lig_version) == ("prompt", 9, __version__)
+    first = manifest.shots[0]
+    assert (first.status, first.title, first.prompt) == ("done", "Title 1", "prompt 1")
+    assert (first.png, first.sidecar, first.exit_code) == ("/out/1.png", "/out/1.json", 0)
+    assert first.wall_seconds is not None and first.wall_seconds >= 0
+
+
+def test_manifest_is_written_after_each_shot(tmp_path):
+    from lig.series.manifest import read_manifest
+
+    seen: list[int] = []
+
+    def render(argv, label):
+        seen.append(len(read_manifest(tmp_path).shots))
+        return 0, "/out/x.png"
+
+    run_series(_settings(3), FakePlanner([]), out_dir=tmp_path, seed=1, flags=LigFlags(),
+               render=render)  # fmt: skip
+    assert seen == [0, 1, 2]
+
+
+def test_failure_records_failed_and_skipped_shots(tmp_path):
+    from lig.series.manifest import read_manifest
+
+    run_series(
+        _settings(4), FakePlanner([]), out_dir=tmp_path, seed=1, flags=LigFlags(),
+        render=RecordingLig([], codes={2: 4}),
+    )  # fmt: skip
+    shots = read_manifest(tmp_path).shots
+    assert [(s.index, s.status) for s in shots] == [
+        (1, "done"), (2, "failed"), (3, "skipped"), (4, "skipped")
+    ]  # fmt: skip
+    assert shots[1].exit_code == 4 and shots[1].png is None
+
+
+def test_planning_failure_is_recorded(tmp_path):
+    from lig.series.manifest import read_manifest
+
+    run_series(
+        _settings(3), FakePlanner([], fail_at=2), out_dir=tmp_path, seed=1, flags=LigFlags(),
+        render=RecordingLig([]),
+    )  # fmt: skip
+    assert [s.status for s in read_manifest(tmp_path).shots] == ["done", "failed", "skipped"]
+
+
+def test_keep_going_records_failed_then_done(tmp_path):
+    from lig.series.manifest import read_manifest
+
+    run_series(
+        _settings(), FakePlanner([]), out_dir=tmp_path, seed=1, flags=LigFlags(),
+        render=RecordingLig([], codes={1: 4}), keep_going=True,
+    )  # fmt: skip
+    assert [s.status for s in read_manifest(tmp_path).shots] == ["failed", "done", "done"]
+
+
+def test_gemma_status_reports_model(tmp_path):
+    from lig.series.gemma import GemmaClient
+
+    script = tmp_path / "gemma"
+    script.write_text("#!/bin/sh\n[ \"$1\" = --status ] && echo 'model: gemma-4b'\n")
+    script.chmod(0o755)
+    assert GemmaClient(binary=str(script)).status() == "model: gemma-4b"
+    assert GemmaClient(binary=str(tmp_path / "nope")).status() is None
+    failing = tmp_path / "bad"
+    failing.write_text("#!/bin/sh\nexit 3\n")
+    failing.chmod(0o755)
+    assert GemmaClient(binary=str(failing)).status() is None
+
+
+def test_end_to_end_manifest_links_real_sidecars(tmp_path):
+    from lig.series.manifest import read_manifest
+
+    gemma = _stub_replies(None, tmp_path)
+    out = tmp_path / "o"
+    result = runner.invoke(
+        app,
+        ["Create 2 photos of a woman in Paris", "--engine", "fake", "--gemma", str(gemma),
+         "--seed", "5", "--out", str(out), "--size", "256x256", "--steps", "1"],
+    )  # fmt: skip
+    assert result.exit_code == 0, result.output
+    for shot in read_manifest(out).shots:
+        assert shot.png and Path(shot.png).exists()
+        assert shot.sidecar and Path(shot.sidecar).exists()

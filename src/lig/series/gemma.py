@@ -49,6 +49,16 @@ class GemmaClient:
             raise GemmaNotFound()
         return found
 
+    def status(self) -> str | None:
+        """The model `gemma --status` reports, for `series.json`; None if it cannot be read."""
+        try:
+            proc = subprocess.run(
+                [self.resolve(), "--status"], capture_output=True, text=True, timeout=self.timeout
+            )
+        except (GemmaError, OSError, subprocess.TimeoutExpired):
+            return None
+        return proc.stdout.strip() or None if proc.returncode == 0 else None
+
     def complete(self, system: str, request: str, *, temperature: float, max_tokens: int) -> str:
         argv = [
             self.resolve(),
