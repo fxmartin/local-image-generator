@@ -43,6 +43,7 @@ def main(
         None, "--out", help="Series directory; default series/YYYYMMDD-HHMMSS_<slug>."
     ),
     keep_going: bool = typer.Option(False, "--keep-going", help="Render the rest after a failure."),
+    no_sheet: bool = typer.Option(False, "--no-sheet", help="Skip the sheet.png contact sheet."),
     gemma: str | None = typer.Option(None, "--gemma", help="The gemma command to call."),
     plan_timeout: float = typer.Option(600.0, "--plan-timeout", help="Seconds per gemma call."),
 ) -> None:
@@ -77,6 +78,7 @@ def main(
         keep_going=keep_going,
         request=request,
         gemma_model=client.status(),
+        sheet=not no_sheet,
     )
     raise typer.Exit(result.exit_code)
 

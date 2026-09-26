@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import TextIO
 
 from lig import __version__
+from lig.series import sheet as contact_sheet
 from lig.series.manifest import (
     CONTINUITY_PROMPT,
     SERIES_FILE,
@@ -92,11 +93,13 @@ def run_series(
     keep_going: bool = False,
     request: str = "",
     gemma_model: str | None = None,
+    sheet: bool = True,
 ) -> SeriesResult:
     """Plan and render shot by shot; the next `gemma` call waits for the render to finish.
 
     A `lig` failure stops the series with lig's exit code (finished shots stay);
-    `keep_going` renders the rest and exits 1 at the end.
+    `keep_going` renders the rest and exits 1 at the end. Two or more rendered shots get a
+    `sheet.png` (only the rendered ones) unless `sheet` is False.
     """
     result = SeriesResult()
     manifest = SeriesManifest(
@@ -158,4 +161,18 @@ def run_series(
             for n in range(len(manifest.shots) + 1, settings.count + 1)
         )
     write_manifest(out_dir, manifest)
+    if sheet:
+        _write_sheet(out_dir, result.paths)
     return result
+
+
+def _write_sheet(out_dir: Path, paths: list[Path]) -> None:
+    rendered = [(i + 1, f"Shot {i + 1}", p) for i, p in enumerate(paths)]
+    if len(rendered) < contact_sheet.MIN_SHOTS:
+        return
+    try:
+        path = contact_sheet.build_sheet(rendered, out_dir)
+    except OSError as error:  # the series itself succeeded; the sheet is a nicety
+        print(f"warning: contact sheet not written: {error}", file=sys.stderr)
+        return
+    print(f"contact sheet: {path}", file=sys.stderr)  # stdout stays one path per shot
