@@ -29,7 +29,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-serve = ["fastapi>=0.110", "uvicorn>=0.29"]
+serve = [
+    "fastapi>=0.110",
+    "python-multipart>=0.0.9",
+    "uvicorn>=0.29",
+]
 mlx = ["mflux>=0.4; sys_platform == 'darwin' and platform_machine == 'arm64'"]
 
 [project.urls]

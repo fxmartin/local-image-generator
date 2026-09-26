@@ -47,7 +47,7 @@ def slugify(prompt: str) -> str:
     return slug or "image"
 
 
-def _sidecar_for(
+def sidecar_for(
     result: ImageResult, created_at: datetime, batch_id: str | None = None
 ) -> SidecarSchema:
     req = result.request
@@ -121,7 +121,7 @@ def write_result(
     """
     out_dir = out_dir or DEFAULT_OUTPUT_DIR
     created_at = now or datetime.now()  # local time, per spec
-    sidecar = _sidecar_for(result, created_at, batch_id)
+    sidecar = sidecar_for(result, created_at, batch_id)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     stem = f"{created_at:%Y%m%d-%H%M%S}_{slugify(sidecar.prompt)}_s{sidecar.seed}"
