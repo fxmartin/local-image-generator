@@ -30,6 +30,7 @@
 | Epic-06 | [Remote Serving](./stories/epic-06-remote-serving.md) | `lig serve` on the M3 Max + `--host` client so the XPS renders remotely | 8 | 26 | Should Have |
 | Epic-07 | [MLX on Apple Silicon](./stories/epic-07-mlx-apple-silicon.md) | mflux backend for Mac speed, transparent output, `pull --for` | 5 | 16 | Should Have |
 | Epic-08 | [Polish & Extensions](./stories/epic-08-polish.md) | Prompt rewriter, job queue, `--json`/`--open`/completion, size sheet, OpenVINO evaluation | 5 | 20 | Could Have |
+| Epic-09 | [Photo Series with Gemma](./stories/epic-09-photo-series.md) | `lig-series`: one request → global `gemma` call → per-shot `gemma` + `lig generate` loop, with the same character across shots and across series | 13 | 40 | Should Have |
 | NFR | [Non-Functional Requirements](./stories/non-functional-requirements.md) | Performance targets, security, accessibility, offline guarantee, reproducibility, pinning | 10 | 18 | Mixed |
 
 ## Epic Navigation
@@ -42,6 +43,7 @@
 - **[Epic-06: Remote Serving](./stories/epic-06-remote-serving.md)** - sd.cpp Metal on the Mac, FastAPI daemon (health, generate, edit, SSE, idle TTL, tailnet bind), `RemoteBackend`, overhead measurement.
 - **[Epic-07: MLX on Apple Silicon](./stories/epic-07-mlx-apple-silicon.md)** - mflux adapter, MLX edit, Mac bench and default, `--transparent`, `pull --for`.
 - **[Epic-08: Polish & Extensions](./stories/epic-08-polish.md)** - P2 backlog, pulled opportunistically.
+- **[Epic-09: Photo Series with Gemma](./stories/epic-09-photo-series.md)** - `lig-series` companion CLI: two-stage planning with the M3 Max's Gemma, one `lig generate` per photo, character continuity (shared look text and seed, optional anchor image, saved characters).
 - **[Non-Functional Requirements](./stories/non-functional-requirements.md)** - Verification stories for the PRD's NFR section.
 
 ## MVP Summary
@@ -64,10 +66,10 @@ Epics 01–05 in full, plus the Must Have NFR stories (NFR-PERF-001, NFR-SEC-002
 | **MVP total** | **38** | **110** |
 
 ## Project Metrics
-- **Total Stories**: 60 (50 functional + 10 NFR)
-- **Total Story Points**: 179
+- **Total Stories**: 73 (63 functional + 10 NFR)
+- **Total Story Points**: 219
 - **MVP Stories**: 38 (110 points)
-- **Post-MVP**: Epic-06 (26), Epic-07 (16), Epic-08 (20), remaining NFR (7) = 69 points
+- **Post-MVP**: Epic-06 (26), Epic-07 (16), Epic-08 (20), Epic-09 (40), remaining NFR (7) = 109 points
 - **Phases**: 0 Spike → 1 XPS local (MVP) → 2 Remote → 3 MLX → 4 Polish
 
 ## Story Dependencies
@@ -120,3 +122,4 @@ Phase 2 starts at **06.1-001** (needs 02.2-002 on macOS) and ends at **06.3-002*
 | 5–6 | Remote serving: the XPS default renderer (Story 02.1-004); start as soon as Epic-04 lands | Epic-06 |
 | 7–8 | MLX | Epic-07 |
 | Backlog | Polish | Epic-08 |
+| Next | Photo series with Gemma (`lig-series`) | Epic-09 |
