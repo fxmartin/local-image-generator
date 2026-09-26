@@ -126,7 +126,7 @@ def bench_engine(engine: str, backend: Backend, request: GenerateRequest, runs: 
     return EngineEntry(
         engine=engine,
         engine_version=last.engine_version,
-        build_backend=build_backend(engine),
+        build_backend=getattr(backend, "build", None) or build_backend(engine),
         weights=_weights(last.weights),
         width=request.width,
         height=request.height,
@@ -178,6 +178,8 @@ def run_bench(
 
 
 def report_path(out_dir: Path, report: BenchReport) -> Path:
+    if report.server_host:  # a remote run must not replace the client's local bench of the day
+        return out_dir / f"{report.date}_{report.host}_via_{report.server_host}.json"
     return out_dir / f"{report.date}_{report.host}.json"
 
 
@@ -286,13 +288,20 @@ def render_markdown(report: BenchReport) -> str:
 
 
 class Overhead(BaseModel):
-    """Remote cost over a local run of the same job, as seen from the client."""
+    """Transfer and protocol cost of one remote run, plus how it compares to a local run.
+
+    `overhead_s` is the client's wall clock minus the server's own total for the same run;
+    `engine_delta_s` (server total minus the separate local bench) is run-to-run engine
+    variance and is reported for information only.
+    """
 
     client_host: str
     server_host: str
     local_total_s: float
+    server_total_s: float
     remote_wall_s: float
     overhead_s: float
+    engine_delta_s: float
     limit_s: float
 
     @property
@@ -301,7 +310,7 @@ class Overhead(BaseModel):
 
 
 def compute_overhead(local: BenchReport, remote: BenchReport, limit_s: float) -> Overhead:
-    """Remote wall clock minus the Mac's local total, for the same prompt, seed and shape."""
+    """Overhead of the remote run itself; the local bench must be the same job."""
     if not remote.server_host:
         raise BenchError("the remote file has no server_host: run `lig bench --host NAME`")
     if not local.results or not remote.results:
@@ -315,13 +324,16 @@ def compute_overhead(local: BenchReport, remote: BenchReport, limit_s: float) ->
         b.steps,
     ):
         raise BenchError("the two runs used different prompt, seed, size or steps")
-    remote_wall = b.median_wall_s if b.median_wall_s is not None else b.median.total_s
+    if b.median_wall_s is None:
+        raise BenchError("the remote file has no client wall-clock time: rerun `lig bench --host`")
     return Overhead(
         client_host=remote.client_host or remote.host,
         server_host=remote.server_host,
         local_total_s=a.median.total_s,
-        remote_wall_s=remote_wall,
-        overhead_s=remote_wall - a.median.total_s,
+        server_total_s=b.median.total_s,
+        remote_wall_s=b.median_wall_s,
+        overhead_s=b.median_wall_s - b.median.total_s,
+        engine_delta_s=b.median.total_s - a.median.total_s,
         limit_s=limit_s,
     )
 
@@ -330,6 +342,8 @@ def render_overhead(o: Overhead) -> str:
     verdict = "PASS" if o.passed else "FAIL"
     return (
         f"Remote overhead {o.client_host} -> {o.server_host}: "
-        f"{o.remote_wall_s:.2f} s remote - {o.local_total_s:.2f} s local = "
-        f"{o.overhead_s:+.2f} s (limit {o.limit_s:g} s): {verdict}"
+        f"{o.remote_wall_s:.2f} s wall - {o.server_total_s:.2f} s on the server = "
+        f"{o.overhead_s:+.2f} s (limit {o.limit_s:g} s): {verdict}\n"
+        f"Server run vs local bench: {o.server_total_s:.2f} s - {o.local_total_s:.2f} s = "
+        f"{o.engine_delta_s:+.2f} s (engine variance between runs, not overhead)"
     )
