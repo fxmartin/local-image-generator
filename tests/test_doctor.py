@@ -69,6 +69,14 @@ def test_meminfo_parse():
     assert doctor.parse_meminfo("garbage") == (None, None)
 
 
+def test_meminfo_counts_the_gpu_driver_page_pool_as_available():
+    # On UMA iGPUs (Intel xe/i915) freed GPU buffers stay in a driver page pool
+    # (GPUReclaim) that the next GPU allocation reuses; MemAvailable leaves it out.
+    # Measured on the XPS: the pool fell from 11.2 GB to 0.1 GB as sd-cli loaded.
+    text = "MemTotal: 1000 kB\nMemAvailable: 400 kB\nGPUReclaim: 300 kB\n"
+    assert doctor.parse_meminfo(text) == (1000 * 1024, 700 * 1024)
+
+
 def test_collect_uses_injected_probes(tmp_path):
     info = doctor.collect_platform_info(
         tmp_path,
