@@ -171,9 +171,9 @@ Exit codes: 0 ok; 1 on a sha256 mismatch, a failed or refused download (not enou
 `lig doctor [--json]` reports platform facts and one row per engine.
 `lig config show|init` prints effective settings or writes a commented `config.toml`.
 Settings resolve as flag > `LIG_*` env > `~/.config/lig/config.toml` > defaults.
-`lig serve [--engine E] [--bind HOST:PORT] [--idle-ttl SECONDS]` starts a daemon (default bind `serve.bind`,
+`lig serve [--engine E] [--bind HOST:PORT]` starts a daemon (default bind `serve.bind`,
 `127.0.0.1:8765`) wrapping one local engine. It needs the `serve` extra (exit 2 with an install
-hint otherwise). `GET /v1/health` returns engine, engine version, weights, `loaded`, `warm`, host,
+hint otherwise). `GET /v1/health` returns engine, engine version, weights, `loaded`, host,
 `lig` version and uptime; `GET /v1/models` returns the artifact state for that engine.
 `POST /v1/generate` (JSON `GenerateRequest`) and `POST /v1/edit` (multipart: `image` file plus
 `prompt` and optional `width`, `height`, `steps`, `seed`, `guidance`, `negative_prompt`,
@@ -181,6 +181,11 @@ hint otherwise). `GET /v1/health` returns engine, engine version, weights, `load
 fields, "remote_host"}, "png_base64": "..."}`. An invalid size is a 422 with the CLI's message;
 an engine failure is a 500 with `error`, `log_tail` (last 20 lines) and the server-side
 `log_path`; an upload over 50 MB is a 413. Jobs run one at a time; concurrent requests wait.
+`POST /v1/generate?stream=1` answers with server-sent events instead: one
+`progress {step, total, elapsed}` per step, then a final `result {metadata, png_b64}` or
+`error {message, log_tail}`. If the client disconnects mid-run the engine is cancelled and the
+lock is released.
+
 An in-process (warm) engine stays loaded between jobs, so a second job within the idle TTL
 reports `load_s ≈ 0`; after `--idle-ttl` seconds (default `serve.idle_ttl` = 600) with no job it
 is unloaded and `health` shows `loaded: false`. `--idle-ttl 0` unloads after every job.

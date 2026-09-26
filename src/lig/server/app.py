@@ -1,18 +1,22 @@
 """FastAPI daemon exposing exactly one local backend, chosen when it starts."""
 
+import asyncio
 import base64
 import hashlib
+import json
 import logging
 import platform
+import queue
 import tempfile
 import threading
 import time
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, ValidationError
 
 from lig import __version__
@@ -28,6 +32,15 @@ log = logging.getLogger(__name__)
 DEFAULT_IDLE_TTL_S = 600.0
 DEFAULT_MAX_UPLOAD_BYTES = 50 * 1024 * 1024
 UPLOAD_CHUNK_BYTES = 1024 * 1024
+STREAM_POLL_SECONDS = 0.05
+
+
+class _ClientGone(Exception):
+    """Raised inside the progress callback to make the runner cancel the engine."""
+
+
+def _sse(event: str, data: dict[str, Any]) -> str:
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
 class RemoteMetadata(SidecarSchema):
@@ -154,8 +167,78 @@ def create_app(
     def models() -> dict[str, Any]:
         return report()
 
+    def stream_generate(request: GenerateRequest) -> StreamingResponse:
+        """Run the job on a worker thread and relay its progress as server-sent events."""
+        events: queue.Queue[str | None] = queue.Queue()
+        gone = threading.Event()
+
+        def work() -> None:
+            with engine_lock:
+                if gone.is_set():  # client left while waiting for the lock
+                    events.put(None)
+                    return
+                began = time.monotonic()
+
+                def on_progress(step: int, total: int) -> None:
+                    if gone.is_set():
+                        raise _ClientGone
+                    elapsed = round(time.monotonic() - began, 3)
+                    events.put(_sse("progress", {"step": step, "total": total, "elapsed": elapsed}))
+
+                try:
+                    body = respond(backend.generate(request, on_progress))
+                    events.put(
+                        _sse(
+                            "result",
+                            {"metadata": body.metadata.model_dump(), "png_b64": body.png_base64},
+                        )
+                    )
+                except _ClientGone:
+                    log.info("client disconnected; generate cancelled")
+                except EngineError as exc:
+                    log.error("generate failed: %s", exc)
+                    failure = json.loads(_engine_failure(exc).body)
+                    events.put(
+                        _sse(
+                            "error",
+                            {"message": failure["error"], "log_tail": failure["log_tail"]},
+                        )
+                    )
+                except BaseException as exc:  # noqa: BLE001 - runner cancels via KeyboardInterrupt
+                    if not gone.is_set():
+                        log.exception("generate crashed")
+                        events.put(
+                            _sse("error", {"message": str(exc) or "internal error", "log_tail": []})
+                        )
+                finally:
+                    events.put(None)
+
+        async def relay() -> AsyncIterator[str]:
+            threading.Thread(target=work, daemon=True).start()
+            try:
+                while True:
+                    try:
+                        item = events.get_nowait()
+                    except queue.Empty:
+                        await asyncio.sleep(STREAM_POLL_SECONDS)
+                        continue
+                    if item is None:
+                        return
+                    yield item
+            finally:
+                # Also runs on cancellation when the client drops the connection.
+                gone.set()
+
+        return StreamingResponse(
+            relay(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
     @api.post("/v1/generate", response_model=GenerateResponse)
-    def generate(request: GenerateRequest) -> Any:
+    def generate(request: GenerateRequest, stream: int = 0) -> Any:
+        if stream:
+            return stream_generate(request)
         with engine_lock:
             try:
                 result = backend.generate(request, None)
