@@ -35,6 +35,9 @@ def bench(
     size: str | None = typer.Option(None, "--size", help="WIDTHxHEIGHT, multiples of 32."),
     steps: int | None = typer.Option(None, "--steps", help="Sampling steps."),
     runs: int = typer.Option(1, "--runs", help="Runs per engine; the median is reported."),
+    host: str | None = typer.Option(
+        None, "--host", help="Bench the remote engine on this `lig serve` host (a [hosts] name)."
+    ),
     out: Path = typer.Option(Path("bench"), "--out", help="Directory for the JSON file."),  # noqa: B008
 ) -> None:
     """Run a fixed prompt and seed on each engine, print a table, write bench/<date>_<host>.json."""
@@ -42,6 +45,8 @@ def bench(
         return
     if runs < 1:
         raise _fail(f"invalid --runs {runs}: must be at least 1", EXIT_USAGE)
+    if host is not None and engines not in (None, "remote"):
+        raise _fail(f"--host runs on the remote engine; drop --engines {engines}", EXIT_USAGE)
     try:
         resolved = cfg.load_settings()
         request = run.build_request(
@@ -51,13 +56,18 @@ def bench(
         raise _fail(str(exc), EXIT_USAGE) from exc
     settings = resolved.settings
     names = (
-        [n.strip() for n in engines.split(",") if n.strip()]
+        ["remote"]
+        if host is not None
+        else [n.strip() for n in engines.split(",") if n.strip()]
         if engines
         else [n for n in sorted(BACKENDS) if n != "fake"]
     )
     verbose = bool((ctx.obj or {}).get("verbose"))
     report = core.run_bench(
-        names, lambda n: run.make_backend(n, settings, verbose=verbose), request, runs
+        names,
+        lambda n: run.make_backend(n, settings, verbose=verbose, host=host),
+        request,
+        runs,
     )
     _print_report(report)
     if not report.results:
@@ -109,3 +119,19 @@ def render(
 ) -> None:
     """Print a bench file as a Markdown table, for docs/bench/*.md."""
     typer.echo(core.render_markdown(_load(path)))
+
+
+@bench_app.command("overhead")
+def overhead(
+    local: Path = typer.Argument(..., help="The Mac's local bench JSON."),  # noqa: B008
+    remote: Path = typer.Argument(..., help="Bench JSON from `lig bench --host`."),  # noqa: B008
+    limit: float = typer.Option(10.0, "--limit", help="Maximum acceptable overhead in seconds."),
+) -> None:
+    """Print remote total minus local total; exit 1 if it exceeds --limit."""
+    try:
+        result = core.compute_overhead(_load(local), _load(remote), limit)
+    except core.BenchError as exc:
+        raise _fail(str(exc), 1) from exc
+    typer.echo(core.render_overhead(result))
+    if not result.passed:
+        raise _fail("overhead above target: open an issue with these numbers", 1)

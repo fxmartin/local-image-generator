@@ -146,11 +146,13 @@ sheet (`--no-sheet` to skip). Exit codes: 0, 1 (a seed failed; earlier images ar
 ```sh
 lig bench --engines sdcpp --size 768x768 --steps 30 --runs 3
 lig bench render bench/<file>.json     # Markdown table for docs/bench/
+lig bench --host m3max                 # bench the remote engine; records client and server host
+lig bench overhead LOCAL.json REMOTE.json [--limit 10]   # remote wall clock - local total
 ```
 
 Fixed prompt and seed per engine; prints load time, s/step, total and peak RSS, and writes
 `bench/<date>_<host>.json`. Exit codes: 0, 2 (bad `--runs`, size or engine), 4 (no engine ran),
-1 (`compare`/`render` cannot read their input).
+1 (`compare`/`render` cannot read their input; `overhead` above `--limit` or inputs that do not match).
 
 ### `lig models`
 
