@@ -145,6 +145,7 @@ docs/STORIES.md (overview and navigation)
     ├── epic-06-remote-serving.md
     ├── epic-07-mlx-apple-silicon.md
     ├── epic-08-polish.md
+    ├── epic-09-photo-series.md
     └── non-functional-requirements.md
 ```
 
