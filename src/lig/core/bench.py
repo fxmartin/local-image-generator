@@ -5,6 +5,7 @@ import platform
 import resource
 import statistics
 import sys
+import time
 from collections.abc import Callable
 from datetime import date
 from pathlib import Path
@@ -34,6 +35,8 @@ class Timing(BaseModel):
 
 class RunRecord(Timing):
     image_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    # Client-side wall clock around generate(); for a remote run this includes transfer + SSE.
+    wall_s: float | None = Field(default=None, ge=0)
 
 
 class EngineEntry(BaseModel):
@@ -46,6 +49,8 @@ class EngineEntry(BaseModel):
     steps: int
     runs: list[RunRecord] = Field(min_length=1)
     median: Timing
+    median_wall_s: float | None = None
+    server_host: str | None = None  # set for remote runs: the machine that rendered the image
     image_sha256: str  # of the first run; identical runs share it under a fixed seed
 
 
@@ -58,6 +63,8 @@ class BenchReport(BaseModel):
     schema_version: int = SCHEMA_VERSION
     date: str
     host: str
+    client_host: str | None = None  # set for remote runs: where the request came from (== host)
+    server_host: str | None = None  # set for remote runs: the `lig serve` machine
     prompt: str
     seed: int
     results: list[EngineEntry]
@@ -101,7 +108,9 @@ def bench_engine(engine: str, backend: Backend, request: GenerateRequest, runs: 
     records: list[RunRecord] = []
     last = None
     for _ in range(runs):
+        started = time.monotonic()
         last = backend.generate(request, None)
+        wall_s = time.monotonic() - started
         timings = last.timings
         records.append(
             RunRecord(
@@ -110,6 +119,7 @@ def bench_engine(engine: str, backend: Backend, request: GenerateRequest, runs: 
                 total_s=timings.total_s,
                 peak_rss_bytes=peak_rss_bytes(engine in IN_PROCESS_ENGINES),
                 image_sha256=hashlib.sha256(last.png).hexdigest(),
+                wall_s=wall_s,
             )
         )
     assert last is not None
@@ -128,6 +138,8 @@ def bench_engine(engine: str, backend: Backend, request: GenerateRequest, runs: 
             total_s=median([r.total_s for r in records]),
             peak_rss_bytes=int(median([r.peak_rss_bytes for r in records])),
         ),
+        median_wall_s=median([r.wall_s for r in records if r.wall_s is not None]),
+        server_host=last.host if last.remote_host else None,
         image_sha256=records[0].image_sha256,
     )
 
@@ -151,9 +163,13 @@ def run_bench(
             results.append(bench_engine(name, backend, request, runs))
         except (EngineError, ValueError) as exc:
             skipped.append(Skipped(engine=name, reason=str(exc).splitlines()[0]))
+    client = platform.node() or "localhost"
+    server = next((e.server_host for e in results if e.server_host), None)
     return BenchReport(
         date=date.today().isoformat(),
-        host=platform.node() or "localhost",
+        host=client,
+        client_host=client if server else None,
+        server_host=server,
         prompt=request.prompt,
         seed=request.seed,
         results=results,
@@ -267,3 +283,53 @@ def render_markdown(report: BenchReport) -> str:
     if report.skipped:
         lines += ["", *(f"- skipped `{s.engine}`: {s.reason}" for s in report.skipped)]
     return "\n".join(lines)
+
+
+class Overhead(BaseModel):
+    """Remote cost over a local run of the same job, as seen from the client."""
+
+    client_host: str
+    server_host: str
+    local_total_s: float
+    remote_wall_s: float
+    overhead_s: float
+    limit_s: float
+
+    @property
+    def passed(self) -> bool:
+        return self.overhead_s <= self.limit_s
+
+
+def compute_overhead(local: BenchReport, remote: BenchReport, limit_s: float) -> Overhead:
+    """Remote wall clock minus the Mac's local total, for the same prompt, seed and shape."""
+    if not remote.server_host:
+        raise BenchError("the remote file has no server_host: run `lig bench --host NAME`")
+    if not local.results or not remote.results:
+        raise BenchError("both bench files need at least one result")
+    a, b = local.results[0], remote.results[0]
+    if (local.prompt, local.seed, a.width, a.height, a.steps) != (
+        remote.prompt,
+        remote.seed,
+        b.width,
+        b.height,
+        b.steps,
+    ):
+        raise BenchError("the two runs used different prompt, seed, size or steps")
+    remote_wall = b.median_wall_s if b.median_wall_s is not None else b.median.total_s
+    return Overhead(
+        client_host=remote.client_host or remote.host,
+        server_host=remote.server_host,
+        local_total_s=a.median.total_s,
+        remote_wall_s=remote_wall,
+        overhead_s=remote_wall - a.median.total_s,
+        limit_s=limit_s,
+    )
+
+
+def render_overhead(o: Overhead) -> str:
+    verdict = "PASS" if o.passed else "FAIL"
+    return (
+        f"Remote overhead {o.client_host} -> {o.server_host}: "
+        f"{o.remote_wall_s:.2f} s remote - {o.local_total_s:.2f} s local = "
+        f"{o.overhead_s:+.2f} s (limit {o.limit_s:g} s): {verdict}"
+    )
