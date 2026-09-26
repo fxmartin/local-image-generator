@@ -58,6 +58,7 @@ def _render_plan(
     seed: int | None,
     flags: LigFlags,
     keep_going: bool,
+    sheet: bool,
 ) -> None:
     """Render a saved plan without `gemma`; with `resume`, only shots lacking an image."""
     try:
@@ -95,6 +96,7 @@ def _render_plan(
         keep_going=keep_going,
         request=plan.request,
         done=done,
+        sheet=sheet,
     )
     raise typer.Exit(result.exit_code)
 
@@ -143,7 +145,7 @@ def main(
     elif request is None:
         _usage("a request is required unless --from-plan is given")
     if from_plan is not None:
-        _render_plan(from_plan, out, resume, seed, _flags(locals()), keep_going)
+        _render_plan(from_plan, out, resume, seed, _flags(locals()), keep_going, False)
     assert request is not None
     series_dir = out or Path("series") / f"{datetime.now():%Y%m%d-%H%M%S}_{slugify(request)}"
     client = GemmaClient(binary=gemma, timeout=plan_timeout)
