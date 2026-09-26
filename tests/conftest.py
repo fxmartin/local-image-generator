@@ -12,7 +12,11 @@ import pytest
 
 STUBS_DIR = Path(__file__).parent / "stubs"
 # Source file -> the real binary name the adapters look up on PATH.
-STUB_BINARIES = {"sd_cli_stub.py": "sd-cli", "ncnn_stub.py": "qwenimage-ncnn-vulkan"}
+STUB_BINARIES = {
+    "sd_cli_stub.py": "sd-cli",
+    "ncnn_stub.py": "qwenimage-ncnn-vulkan",
+    "gemma_stub.py": "gemma",
+}
 
 requires_non_root = pytest.mark.skipif(
     hasattr(os, "geteuid") and os.geteuid() == 0,
