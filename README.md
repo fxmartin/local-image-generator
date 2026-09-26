@@ -202,7 +202,7 @@ is unloaded and `health` shows `loaded: false`. `--idle-ttl 0` unloads after eve
 Subprocess engines (sd.cpp, ncnn) cannot stay warm: `health` reports `warm: "unsupported"` and
 the TTL is a no-op. Warm serving arrives with the MLX engine (Epic-07).
 
-### `lig-series`
+### Photo series (`lig-series`)
 
 ```sh
 lig-series "Create 10 photos black and white of a woman in Paris" --size 768x768 --steps 30
@@ -220,9 +220,28 @@ defaults. Also `--count`, `--max-shots`, `--style`, `--setting`, `--gemma`, `--p
 A `lig` failure stops the series and exits with lig's code, keeping finished shots;
 `--keep-going` renders the rest and exits 1.
 
-Rendering time is real: a 1024x1024, 40-step shot takes about 10 min, so 10 photos take about
-100 min. Use `--size 768x768 --steps 30` for drafts, and never go below about 30 steps: fewer
-gives ghosted, doubled subjects.
+`lig-series` installs with `lig` (`uv tool install .`). `lig-series --help` works without `gemma`;
+only running a plan needs it.
+
+Fix a weak scene before spending GPU time. `--plan-only` runs the planning calls, prints the
+settings and one prompt per shot, writes `plan.json` and renders nothing; edit that file, then
+`--from-plan` renders it without calling `gemma`:
+
+```sh
+lig-series "Create 10 photos black and white of a woman in Paris" --plan-only
+lig-series --from-plan series/20260101-120000_paris/plan.json
+```
+
+`--character NAME` saves the look, name and reference image the first time and reuses them in
+every later series, so the same person recurs:
+
+```sh
+lig-series "2 photos of her at a flea market" --character elara
+```
+
+Rendering time is real: a 1024x1024, 40-step shot takes about 10 min on the M3 Max, so 10 photos
+take about 100 min. Use `--size 768x768 --steps 30` for drafts, and never go below 30 steps:
+fewer gives ghosted, doubled subjects.
 
 ## Troubleshooting
 
