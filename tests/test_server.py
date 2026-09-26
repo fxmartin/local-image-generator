@@ -353,6 +353,8 @@ class _GatedBackend(FakeBackend):
         self.aborted = threading.Event()
 
     def generate(self, request, on_progress):
+        if on_progress is None:  # the non-streaming follow-up job
+            return super().generate(request, None)
         on_progress(1, request.steps)
         self.first_step.set()
         assert self.proceed.wait(10)
