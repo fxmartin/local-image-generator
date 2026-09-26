@@ -233,7 +233,21 @@ directory and starts no `lig` process. Edit the file, then render it with
 scenes). After an interruption, `lig-series --from-plan plan.json --out SERIES_DIR --resume`
 renders only the shots without an image, reusing the series' seed.
 
-Rendering time is real: a 1024x1024, 40-step shot takes about 10 min, so 10 photos take about
+```sh
+lig-series "Create 10 photos black and white of a woman in Paris" --plan-only
+lig-series --from-plan series/20260101-120000_paris/plan.json
+```
+
+`--character NAME` makes the character reusable across series. The first time (and only if the
+series finishes cleanly) it saves `character.json` (name, look, style, base seed, source series)
+under `~/.local/share/lig/characters/NAME/` (`$XDG_DATA_HOME/lig/characters/` when set; a
+`reference.png` is stored there too when a reference image exists). Later series with the same
+`--character` give the saved name and look to the global call as fixed input (they replace
+whatever the model returns) and reuse the saved seed unless `--seed` is passed. Manage them with
+`lig-series characters list`, `characters show NAME` and `characters rm NAME` (`--yes` skips the
+confirmation).
+
+Rendering time is real: a 1024x1024, 40-step shot takes about 10 min on the M3 Max, so 10 photos take about
 100 min. Use `--size 768x768 --steps 30` for drafts, and never go below about 30 steps: fewer
 gives ghosted, doubled subjects.
 

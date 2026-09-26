@@ -65,6 +65,8 @@ def _isolated_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     platformdirs ignores XDG_CONFIG_HOME, so this protects Linux (CI and the XPS) only.
     """
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg-config"))
+    # Saved series characters live under the data dir; lig.series.characters honours it on macOS.
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg-data"))
     for key in [k for k in os.environ if k.startswith("LIG_")]:
         monkeypatch.delenv(key)
 

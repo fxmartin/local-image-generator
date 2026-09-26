@@ -202,7 +202,7 @@ def test_missing_gemma_exits_4(tmp_path):
 
 @pytest.mark.parametrize("flag", ["--keep-going"])
 def test_help_lists_flags(flag):
-    assert flag in runner.invoke(app, ["--help"], terminal_width=200).output
+    assert flag in runner.invoke(app, ["run", "--help"], terminal_width=200).output
 
 
 # --- Story 09.2-002: series.json manifest -----------------------------------------------------
