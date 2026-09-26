@@ -19,11 +19,15 @@ SCENE_MAX_WORDS = 80
 
 
 class Shot(BaseModel):
-    """`plan_seconds` is the wall time of the shot's gemma call(s), recorded in `series.json`."""
+    """`plan_seconds` is the wall time of the shot's gemma call(s), recorded in `series.json`.
+
+    `prompt` is the composed image prompt (09.1-003), stored so a re-render needs no LLM call.
+    """
 
     title: NonBlank
     scene: NonBlank
     plan_seconds: float = 0.0
+    prompt: str = ""
 
     @field_validator("title")
     @classmethod
