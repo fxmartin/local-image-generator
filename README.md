@@ -172,7 +172,12 @@ Settings resolve as flag > `LIG_*` env > `~/.config/lig/config.toml` > defaults.
 `127.0.0.1:8765`) wrapping one local engine. It needs the `serve` extra (exit 2 with an install
 hint otherwise). `GET /v1/health` returns engine, engine version, weights, `loaded`, host,
 `lig` version and uptime; `GET /v1/models` returns the artifact state for that engine.
-Generation endpoints come with the remote client.
+`POST /v1/generate` (JSON `GenerateRequest`) and `POST /v1/edit` (multipart: `image` file plus
+`prompt` and optional `width`, `height`, `steps`, `seed`, `guidance`, `negative_prompt`,
+`transparent`, `strength`) run the job and return a JSON envelope `{"metadata": {...sidecar
+fields, "remote_host"}, "png_base64": "..."}`. An invalid size is a 422 with the CLI's message;
+an engine failure is a 500 with `error`, `log_tail` (last 20 lines) and the server-side
+`log_path`; an upload over 50 MB is a 413. Jobs run one at a time; concurrent requests wait.
 
 ## Troubleshooting
 

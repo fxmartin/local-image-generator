@@ -146,3 +146,153 @@ def test_cli_serve_without_extra_exits_2(monkeypatch):
     result = runner.invoke(app, ["serve", "--engine", "fake"])
     assert result.exit_code == 2
     assert "[serve]" in result.output
+
+
+# --- POST /v1/generate and /v1/edit (story 06.2-002) ---
+
+import base64  # noqa: E402
+import io  # noqa: E402
+import threading  # noqa: E402
+import time  # noqa: E402
+
+from PIL import Image  # noqa: E402
+
+from lig.backends.base import EngineError  # noqa: E402
+
+
+def _png(size: tuple[int, int] = (64, 64)) -> bytes:
+    buf = io.BytesIO()
+    Image.new("RGB", size, "red").save(buf, "PNG")
+    return buf.getvalue()
+
+
+def _decode(body: dict) -> Image.Image:
+    return Image.open(io.BytesIO(base64.b64decode(body["png_base64"])))
+
+
+def test_generate_returns_envelope_with_png_and_sidecar_fields(client):
+    resp = client.post(
+        "/v1/generate",
+        json={"prompt": "a cat", "width": 256, "height": 256, "steps": 2, "seed": 7},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert _decode(body).size == (256, 256)
+    meta = body["metadata"]
+    assert meta["prompt"] == "a cat"
+    assert meta["seed"] == 7
+    assert meta["size"] == [256, 256]
+    assert meta["engine"] == "fake"
+    assert meta["remote_host"]
+    assert meta["source_sha256"] is None
+
+
+def test_generate_invalid_size_is_422_with_cli_message(client):
+    resp = client.post("/v1/generate", json={"prompt": "x", "width": 1000})
+    assert resp.status_code == 422
+    assert "nearest valid size is 992" in resp.text
+
+
+def test_generate_engine_failure_is_500_with_log_tail_and_path(tmp_path):
+    log = tmp_path / "engine.log"
+    log.write_text("\n".join(f"line {i}" for i in range(50)))
+
+    class Failing(FakeBackend):
+        def _run(self, request, on_progress):
+            raise EngineError("boom", log_path=log)
+
+    api = TestClient(create_app(Failing(), load_registry(), tmp_path))
+    resp = api.post("/v1/generate", json={"prompt": "x", "steps": 1, "width": 256, "height": 256})
+    assert resp.status_code == 500
+    detail = resp.json()
+    assert detail["log_path"] == str(log)
+    assert detail["log_tail"] == [f"line {i}" for i in range(30, 50)]
+    assert "boom" in detail["error"]
+
+
+def test_generate_engine_failure_without_log_falls_back_to_stderr(tmp_path):
+    api = TestClient(create_app(FakeBackend(fail=True), load_registry(), tmp_path))
+    resp = api.post("/v1/generate", json={"prompt": "x", "steps": 1, "width": 256, "height": 256})
+    assert resp.status_code == 500
+    assert resp.json()["log_path"] is None
+    assert resp.json()["log_tail"] == ["fake engine failure"]
+
+
+def test_edit_multipart_returns_envelope_with_source_hash(client):
+    import hashlib
+
+    data = _png()
+    resp = client.post(
+        "/v1/edit",
+        data={"prompt": "make it blue", "width": "256", "height": "256", "steps": "2"},
+        files={"image": ("ref.png", data, "image/png")},
+    )
+    assert resp.status_code == 200
+    meta = resp.json()["metadata"]
+    assert meta["source_sha256"] == hashlib.sha256(data).hexdigest()
+    assert meta["source_path"] == "ref.png"
+    assert meta["remote_host"]
+
+
+def test_edit_invalid_size_is_422(client):
+    resp = client.post(
+        "/v1/edit",
+        data={"prompt": "x", "width": "1000"},
+        files={"image": ("ref.png", _png(), "image/png")},
+    )
+    assert resp.status_code == 422
+    assert "nearest valid size" in resp.text
+
+
+def test_edit_over_limit_is_413(tmp_path):
+    api = TestClient(create_app(FakeBackend(), load_registry(), tmp_path, max_upload_bytes=1024))
+    resp = api.post(
+        "/v1/edit",
+        data={"prompt": "x"},
+        files={"image": ("ref.png", b"\0" * 2048, "image/png")},
+    )
+    assert resp.status_code == 413
+
+
+def test_edit_accepts_large_upload_under_default_limit(client):
+    resp = client.post(
+        "/v1/edit",
+        data={"prompt": "x", "width": "256", "height": "256", "steps": "1"},
+        files={"image": ("ref.png", _png() + b"\0" * (20 * 1024 * 1024), "image/png")},
+    )
+    assert resp.status_code == 200
+
+
+def test_concurrent_requests_are_serialised(tmp_path):
+    active = 0
+    peak = 0
+    guard = threading.Lock()
+
+    class Slow(FakeBackend):
+        def _run(self, request, on_progress):
+            nonlocal active, peak
+            with guard:
+                active += 1
+                peak = max(peak, active)
+            time.sleep(0.05)
+            try:
+                return super()._run(request, on_progress)
+            finally:
+                with guard:
+                    active -= 1
+
+    api = TestClient(create_app(Slow(), load_registry(), tmp_path))
+    payload = {"prompt": "x", "steps": 1, "width": 256, "height": 256}
+    codes: list[int] = []
+    threads = [
+        threading.Thread(
+            target=lambda: codes.append(api.post("/v1/generate", json=payload).status_code)
+        )
+        for _ in range(3)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert codes == [200, 200, 200]
+    assert peak == 1

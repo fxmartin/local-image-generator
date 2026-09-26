@@ -1,19 +1,45 @@
 """FastAPI daemon exposing exactly one local backend, chosen when it starts."""
 
+import base64
+import hashlib
 import logging
 import platform
+import tempfile
+import threading
 import time
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ValidationError
 
 from lig import __version__
-from lig.backends.base import Backend
+from lig.backends.base import Backend, EngineError
+from lig.core.logs import TAIL_LINES, tail_lines
+from lig.core.models import EditRequest, GenerateRequest, ImageResult
+from lig.core.output import SidecarSchema, sidecar_for
 from lig.models import cache
 from lig.models.registry import Registry
 
 log = logging.getLogger(__name__)
+
+DEFAULT_MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+UPLOAD_CHUNK_BYTES = 1024 * 1024
+
+
+class RemoteMetadata(SidecarSchema):
+    """The client's sidecar fields plus the host that actually ran the job."""
+
+    remote_host: str
+
+
+class GenerateResponse(BaseModel):
+    """PNG and metadata in one body so they can never disagree."""
+
+    metadata: RemoteMetadata
+    png_base64: str
 
 
 def parse_bind(text: str) -> tuple[str, int]:
@@ -33,10 +59,43 @@ def _engine_version(backend: Backend) -> str:
         return "unknown"
 
 
-def create_app(backend: Backend, registry: Registry, models_dir: Path) -> FastAPI:
+def _validation_detail(exc: ValidationError) -> list[dict[str, Any]]:
+    return [{"loc": list(e["loc"]), "msg": e["msg"], "type": e["type"]} for e in exc.errors()]
+
+
+def _engine_failure(exc: EngineError) -> JSONResponse:
+    tail = tail_lines(exc.log_path, TAIL_LINES) or exc.stderr.splitlines()[-TAIL_LINES:]
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": (str(exc).splitlines() or ["engine failed"])[0],
+            "log_tail": tail,
+            "log_path": str(exc.log_path) if exc.log_path else None,
+        },
+    )
+
+
+def create_app(
+    backend: Backend,
+    registry: Registry,
+    models_dir: Path,
+    max_upload_bytes: int = DEFAULT_MAX_UPLOAD_BYTES,
+) -> FastAPI:
     api = FastAPI(title="lig serve", version=__version__)
     started = time.monotonic()
     host = platform.node() or "localhost"
+    # One engine process at a time; a queue with states is Epic-08.
+    engine_lock = threading.Lock()
+
+    def respond(result: ImageResult, source_name: str | None = None) -> GenerateResponse:
+        sidecar = sidecar_for(result, datetime.now(UTC))
+        if source_name is not None:
+            # The server-side temp path is meaningless to the client.
+            sidecar = sidecar.model_copy(update={"source_path": source_name})
+        metadata = RemoteMetadata(**sidecar.model_dump(), remote_host=host)
+        return GenerateResponse(
+            metadata=metadata, png_base64=base64.b64encode(result.png).decode("ascii")
+        )
 
     def report() -> dict[str, Any]:
         return cache.build_report(registry, models_dir, backend.name)
@@ -60,5 +119,69 @@ def create_app(backend: Backend, registry: Registry, models_dir: Path) -> FastAP
     @api.get("/v1/models")
     def models() -> dict[str, Any]:
         return report()
+
+    @api.post("/v1/generate", response_model=GenerateResponse)
+    def generate(request: GenerateRequest) -> Any:
+        with engine_lock:
+            try:
+                result = backend.generate(request, None)
+            except EngineError as exc:
+                log.error("generate failed: %s", exc)
+                return _engine_failure(exc)
+        return respond(result)
+
+    @api.post("/v1/edit", response_model=GenerateResponse)
+    def edit(
+        image: Annotated[UploadFile, File()],
+        prompt: Annotated[str, Form()],
+        width: Annotated[int | None, Form()] = None,
+        height: Annotated[int | None, Form()] = None,
+        steps: Annotated[int | None, Form()] = None,
+        seed: Annotated[int | None, Form()] = None,
+        guidance: Annotated[float | None, Form()] = None,
+        negative_prompt: Annotated[str | None, Form()] = None,
+        transparent: Annotated[bool, Form()] = False,
+        strength: Annotated[float | None, Form()] = None,
+    ) -> Any:
+        with tempfile.TemporaryDirectory(prefix="lig-edit-") as tmp:
+            reference = Path(tmp) / "reference.png"
+            digest = hashlib.sha256()
+            received = 0
+            with reference.open("wb") as out:
+                while chunk := image.file.read(UPLOAD_CHUNK_BYTES):
+                    received += len(chunk)
+                    if received > max_upload_bytes:
+                        raise HTTPException(
+                            413, f"reference image exceeds the {max_upload_bytes} byte limit"
+                        )
+                    digest.update(chunk)
+                    out.write(chunk)
+            given = {
+                "prompt": prompt,
+                "width": width,
+                "height": height,
+                "steps": steps,
+                "seed": seed,
+                "guidance": guidance,
+                "negative_prompt": negative_prompt,
+                "strength": strength,
+            }
+            fields: dict[str, Any] = {k: v for k, v in given.items() if v is not None}
+            try:
+                request = EditRequest(
+                    **fields,
+                    transparent=transparent,
+                    reference_image=reference,
+                    reference_sha256=digest.hexdigest(),
+                )
+            except ValidationError as exc:
+                raise HTTPException(422, detail=_validation_detail(exc)) from exc
+            with engine_lock:
+                try:
+                    result = backend.edit(request, None)
+                except EngineError as exc:
+                    log.error("edit failed: %s", exc)
+                    return _engine_failure(exc)
+        return respond(result, source_name=image.filename or "reference.png")
 
     return api
