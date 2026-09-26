@@ -45,3 +45,16 @@ def test_readme_photo_series_section_content():
     for needle in ("--plan-only", "--from-plan", "--character", "M3 Max", "30 steps"):
         assert needle in section, needle
     assert "gemma" in section
+
+
+def test_module_main_guard_runs_the_app(monkeypatch):
+    import runpy
+    import sys
+
+    monkeypatch.setattr(sys, "argv", ["lig-series", "--help"])
+    try:
+        runpy.run_module("lig.series.cli", run_name="__main__")
+    except SystemExit as exc:
+        assert exc.code == 0
+    else:  # pragma: no cover
+        raise AssertionError("expected SystemExit")
