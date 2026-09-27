@@ -2,6 +2,7 @@
 
 import hashlib
 import sys
+from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
@@ -159,3 +160,16 @@ def test_prune_nothing_to_do(env):
     result = runner.invoke(app, ["models", "prune"])
     assert result.exit_code == 0
     assert "nothing to prune" in result.output
+
+
+def test_prune_unlink_failure_exits_1(env, monkeypatch):
+    models, reg, _ = env
+    _install(models, reg, "retired")
+
+    def bad_unlink(self):
+        raise OSError("boom")
+
+    monkeypatch.setattr(Path, "unlink", bad_unlink)
+    result = runner.invoke(app, ["models", "prune", "--yes"])
+    assert result.exit_code == 1
+    assert "error: boom" in result.output

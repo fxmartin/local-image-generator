@@ -1,6 +1,7 @@
 """`lig models verify`, `rm` and `path` against a temp cache; no network."""
 
 import hashlib
+from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
@@ -120,6 +121,19 @@ def test_rm_removes_part_and_corrupt_leftovers(env):
 
 def test_rm_nothing_present_exits_1(env):
     assert runner.invoke(app, ["models", "rm", "b", "--yes"]).exit_code == 1
+
+
+def test_rm_unlink_failure_exits_1(env, monkeypatch):
+    models, reg = env
+    _install(models, reg, "b")
+
+    def bad_unlink(self):
+        raise OSError("boom")
+
+    monkeypatch.setattr(Path, "unlink", bad_unlink)
+    result = runner.invoke(app, ["models", "rm", "b", "--yes"])
+    assert result.exit_code == 1
+    assert "error: boom" in result.output
 
 
 def test_rm_warns_when_default_engine_loses_artifact(env, monkeypatch):
