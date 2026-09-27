@@ -200,6 +200,26 @@ def test_template_mentions_mlx_quantize():
     assert "engines.mlx.quantize" in cfg.CONFIG_TEMPLATE
 
 
+def test_mlx_image_strength_default_and_bounds():
+    assert cfg.Settings().engines.mlx.image_strength == 0.6
+    with pytest.raises(ValueError):
+        cfg.Settings(engines={"mlx": {"image_strength": 1.5}})
+    with pytest.raises(ValueError):
+        cfg.Settings(engines={"mlx": {"image_strength": -0.1}})
+
+
+def test_mlx_image_strength_env_var(tmp_path):
+    res = cfg.load_settings(
+        env={"LIG_ENGINES__MLX__IMAGE_STRENGTH": "0.8"}, path=tmp_path / "x.toml"
+    )
+    assert res.settings.engines.mlx.image_strength == 0.8
+    assert res.provenance["engines.mlx.image_strength"] == "env"
+
+
+def test_template_mentions_mlx_image_strength():
+    assert "engines.mlx.image_strength" in cfg.CONFIG_TEMPLATE
+
+
 def test_template_host_example_uses_the_serve_default_port():
     from lig.server.bind import DEFAULT_PORT
 

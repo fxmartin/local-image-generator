@@ -17,6 +17,9 @@ env vars, e.g. `LIG_SERVE__BIND`.
   `["--model-args", "qwen_image_2_1_prefix_cache=false"]`.
 - `engines.mlx.quantize` (`"4"`, `"8"` or `"none"`; env `LIG_ENGINES__MLX__QUANTIZE`; default
   `"8"`) selects mflux's `QwenImage21` quantization; `"none"` runs bf16.
+- `engines.mlx.image_strength` (`0.0`-`1.0`; env `LIG_ENGINES__MLX__IMAGE_STRENGTH`; default
+  `0.6`) is the mflux img2img strength `lig edit --engine mlx` uses when `--strength` is
+  omitted.
 - `output_dir` and `models_dir` expand a leading `~` to your home directory.
 
 Model weights are cached under the platform cache dir (`~/.cache/lig/models` on Linux);
@@ -57,18 +60,29 @@ entry records its license and the engine build it was measured with (`pinned_eng
 transformer, VAE and ncnn files are under the Qwen Research License (research/evaluation use
 only), not Apache-2.0. The 2.1 VAE is not interchangeable with earlier Qwen-Image VAEs.
 
-Keys: `engine`, `output_dir`, `models_dir`, `default_host`, `hosts.NAME` (a `[hosts]` table of `NAME = "http://host:port"`), `ncnn_binary`, `ncnn_model_dir`, `steps`, `size`, `serve.bind`, `engines.sdcpp.extra_args`, `engines.mlx.quantize`.
+Keys: `engine`, `output_dir`, `models_dir`, `default_host`, `hosts.NAME` (a `[hosts]` table of `NAME = "http://host:port"`), `ncnn_binary`, `ncnn_model_dir`, `steps`, `size`, `serve.bind`, `engines.sdcpp.extra_args`, `engines.mlx.quantize`, `engines.mlx.image_strength`.
 The `ncnn` engine needs `ncnn_binary` (or `qwenimage-ncnn-vulkan` on `PATH`) and `ncnn_model_dir` (the `qwenimage21/` folder); it prints no per-step progress, so expect a spinner with elapsed time.
-The `mlx` engine (macOS arm64 only, needs the `mlx` extra) runs mflux's `QwenImage21` in-process and keeps it warm between `lig serve` jobs; `lig edit --engine mlx` is not implemented yet.
+The `mlx` engine (macOS arm64 only, needs the `mlx` extra) runs mflux's `QwenImage21` in-process and keeps it warm between `lig serve` jobs. `lig edit --engine mlx` maps onto mflux's img2img path
+(`image_path` set to the reference image, `image_strength` from `--strength` or `engines.mlx.image_strength`,
+default `0.6`) rather than sd.cpp's instruction editing (see "Editing" below); `capabilities()` checks the
+installed mflux's `generate_image` signature for `image_path`/`image_strength` and reports `supports_edit`
+accordingly, so an mflux version without them exits 4 with `edit unsupported: ...` instead of failing mid-run.
 
 ## Editing
 
 `lig edit IMAGE PROMPT [--size WxH] [--steps N] [--seed S] [--engine E] [--strength 0..1] [--host NAME] [--out DIR] [--force]`
-applies an instruction edit ("make the teapot blue") to an existing image and writes a new PNG plus
-sidecar; the sidecar records the source's `source_path` and `source_sha256`. With no `--size`, the
-output is the source size rounded down to multiples of 32, and the command says so. Exit 4 if the
-engine cannot edit (e.g. the sdcpp `mmproj` weight is missing), 2 if IMAGE is not a readable image.
-With `--host` the image is uploaded to the server; the sidecar's `source_path` stays the local file.
+applies an edit to an existing image and writes a new PNG plus sidecar; the sidecar records the
+source's `source_path` and `source_sha256`. With no `--size`, the output is the source size
+rounded down to multiples of 32, and the command says so. Exit 4 if the engine cannot edit (e.g.
+the sdcpp `mmproj` weight is missing, or mflux's `QwenImage21` lacks img2img support), 2 if IMAGE
+is not a readable image. With `--host` the image is uploaded to the server; the sidecar's
+`source_path` stays the local file.
+
+`sdcpp` follows PROMPT as an instruction ("make the teapot blue") via its `mmproj` vision path.
+`mlx` has no instruction-editing path at the pinned mflux version -- it runs plain img2img:
+PROMPT still guides denoising, but `--strength` (0.0-1.0, default `engines.mlx.image_strength` =
+0.6) controls how far the result moves from IMAGE. Lower strengths (0.3-0.5) stay close to the
+source; 0.6-0.8 allows a bigger change; above ~0.9 the source barely constrains the result.
 
 ## Generating
 

@@ -215,7 +215,10 @@ def make_backend(
         )
     if name == "mlx":
         return get_backend(
-            name, models_dir=settings.models_dir, quantize=settings.engines.mlx.quantize
+            name,
+            models_dir=settings.models_dir,
+            quantize=settings.engines.mlx.quantize,
+            image_strength=settings.engines.mlx.image_strength,
         )
     return get_backend(name)
 
