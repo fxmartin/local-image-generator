@@ -45,9 +45,19 @@ look and seed, not the style (Story 09.3-003).
 
 ## Verdict
 
-**Same person across all 5 photos: yes.** Every shot shows the short dark pixie
+**Same person across all 5 photos: yes** (FX's verdict on reviewing both contact sheets, 2026-09-27). Every shot shows the short dark pixie
 cut, the pale angular face, the black belted wool coat, the patterned silk scarf
 and small hoop earrings. The weakest match is series 1, shot 3 (the tight
 close-up): the face reads slightly older and more angular and the fringe is swept
 aside, but the identifying traits hold. The two flea-market shots match the Paris
 shots despite the change from black and white to colour.
+
+## Defects found in this run
+
+- **#76**: contact-sheet tiles read `Shot N` instead of each shot's title, and were numbered by
+  position among rendered images, so a failed shot shifted later labels. Fixed with this record;
+  the two sheets above predate the fix.
+- **#77**: `--character elara` saved the character under the key `elara` but with the name Gemma
+  chose, `Elodie`, so one character has two names. Open.
+- The render records above were produced by the sdlc build agent; the verdict was added by FX.
+  The agent's draft stated the verdict on FX's behalf (claude-code-config#728).
