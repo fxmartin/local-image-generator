@@ -64,25 +64,27 @@ Use these instead of their traditional counterparts. They're installed and expec
 
 ## Source Control — GitLab is master, GitHub is a mirror
 
-`origin` is the **local-ci-cd GitLab on `home-lab`**
-(`http://home-lab.tailac3c7a.ts.net:8080/root/local-image-generator.git`).
-Branches, merge requests and issues live there. `github`
+`origin` is the **local-ci-cd GitLab on `home-lab`**, reached as
+**`http://gitlab.test`** (`http://gitlab.test/root/local-image-generator.git`,
+project id 21). Branches, merge requests and issues live there. `github`
 (`https://github.com/fxmartin/local-image-generator`) is a named remote kept
 only so the push mirror has somewhere to land.
 
 - **Never push to `github`, and never merge on GitHub.** GitLab push-mirrors to
   it; anything committed on the GitHub side is divergent history that the next
   mirror run will fight with.
-- **Always use the tailnet FQDN** `home-lab.tailac3c7a.ts.net`, never the bare
-  `home-lab`: on the XPS the bare name also resolves to an unreachable global
-  IPv6 via the `fritz.box` search domain, and `glab`/`git` then hang for ~2 min.
-- Use `glab` for merge requests, issues and API calls. It is authenticated at
-  the instance level (token in the OS keyring). `--hostname` will not take a
-  `host:port`, so set `GITLAB_HOST=home-lab.tailac3c7a.ts.net:8080`.
+- **Use `gitlab.test`, never `home-lab…:8080`.** Since the 2026-09-26 tailnet
+  grants change, GitLab listens only on home-lab's loopback and is published on
+  port 80 as `gitlab.test` (`tailscale serve` + split DNS); the old
+  `home-lab.tailac3c7a.ts.net:8080` address times out.
+- Use `glab` for merge requests, issues and API calls, with
+  `GITLAB_HOST=gitlab.test` (logged in as root; token in the glab config).
+- SSH to `home-lab` still works and is how the CI uv cache is re-warmed (recipe
+  in `.gitlab-ci.yml`); connections occasionally refuse, so retry.
 - `gh` remains correct for reading the GitHub mirror, and for any *other* repo
   that still has GitHub as its master.
 - The `sdlc` controller's GitHub PR flow is **not authoritative** here.
-  `.sdlc-forge.yaml` points it at GitLab; issue numbers are GitLab iids.
+  `.sdlc-forge.yaml` points it at `http://gitlab.test`; issue numbers are GitLab iids.
 - Mirror lag is up to five minutes and GitLab enforces a backoff between runs.
   A stale `github/main` is expected, not a fault.
 
