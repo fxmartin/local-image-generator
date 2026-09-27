@@ -168,12 +168,18 @@ def run_series(
         )
     write_manifest(out_dir, manifest)
     if sheet:
-        _write_sheet(out_dir, result.paths)
+        _write_sheet(out_dir, manifest.shots)
     return result
 
 
-def _write_sheet(out_dir: Path, paths: list[Path]) -> None:
-    rendered = [(i + 1, f"Shot {i + 1}", p) for i, p in enumerate(paths)]
+def _write_sheet(out_dir: Path, shots: list[ShotRecord]) -> None:
+    # Each tile keeps its own shot number and title, so a failed shot leaves a gap in the
+    # numbering instead of shifting every later label (issue #76).
+    rendered = [
+        (s.index, s.title or f"Shot {s.index}", Path(s.png))
+        for s in shots
+        if s.status == "done" and s.png
+    ]
     if len(rendered) < contact_sheet.MIN_SHOTS:
         return
     try:

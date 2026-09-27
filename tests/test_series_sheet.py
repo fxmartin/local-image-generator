@@ -96,3 +96,19 @@ def test_unreadable_image_only_warns(tmp_path, capsys):
 
 def test_cli_advertises_no_sheet():
     assert "--no-sheet" in runner.invoke(app, ["--help"]).output
+
+
+def test_tiles_carry_each_shots_number_and_title_even_after_a_failure(tmp_path, monkeypatch):
+    # Issue #76: tiles read "Shot N" and were numbered by position among rendered images.
+    from lig.series import runner as series_runner
+
+    seen = []
+    monkeypatch.setattr(
+        series_runner.contact_sheet, "build_sheet", lambda shots, out: seen.extend(shots) or out
+    )
+    _run(tmp_path, count=4, codes={2: 4}, keep_going=True)
+    assert [(number, title) for number, title, _ in seen] == [
+        (1, "Title 1"),
+        (3, "Title 3"),
+        (4, "Title 4"),
+    ]
