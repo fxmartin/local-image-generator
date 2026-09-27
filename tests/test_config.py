@@ -179,6 +179,27 @@ def test_serve_idle_ttl_default_and_validation():
         cfg.Settings(serve={"idle_ttl": -1})
 
 
+def test_mlx_quantize_default_and_choices():
+    assert cfg.Settings().engines.mlx.quantize == "8"
+    with pytest.raises(ValueError):
+        cfg.Settings(engines={"mlx": {"quantize": "16"}})
+
+
+def test_mlx_quantize_accepts_a_toml_int():
+    path_settings = cfg.Settings(engines={"mlx": {"quantize": 4}})
+    assert path_settings.engines.mlx.quantize == "4"
+
+
+def test_mlx_quantize_env_var(tmp_path):
+    res = cfg.load_settings(env={"LIG_ENGINES__MLX__QUANTIZE": "none"}, path=tmp_path / "x.toml")
+    assert res.settings.engines.mlx.quantize == "none"
+    assert res.provenance["engines.mlx.quantize"] == "env"
+
+
+def test_template_mentions_mlx_quantize():
+    assert "engines.mlx.quantize" in cfg.CONFIG_TEMPLATE
+
+
 def test_template_host_example_uses_the_serve_default_port():
     from lig.server.bind import DEFAULT_PORT
 

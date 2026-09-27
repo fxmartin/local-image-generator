@@ -44,9 +44,27 @@ class NcnnSettings(BaseModel):
     pass
 
 
+class MlxSettings(BaseModel):
+    # mflux's `-q`: "4" or "8" bits, or "none" for bf16 (no quantization).
+    quantize: str = "8"
+
+    @field_validator("quantize", mode="before")
+    @classmethod
+    def _coerce_str(cls, value: Any) -> Any:
+        return str(value) if isinstance(value, int) else value
+
+    @field_validator("quantize")
+    @classmethod
+    def _valid_choice(cls, value: str) -> str:
+        if value not in {"4", "8", "none"}:
+            raise ValueError("must be '4', '8' or 'none'")
+        return value
+
+
 class EnginesSettings(BaseModel):
     ncnn: NcnnSettings = NcnnSettings()
     sdcpp: SdcppSettings = SdcppSettings()
+    mlx: MlxSettings = MlxSettings()
 
 
 class Settings(BaseModel):
@@ -243,6 +261,10 @@ CONFIG_TEMPLATE = """\
 # Extra sd-cli arguments for the sdcpp engine, appended verbatim
 # (env: LIG_ENGINES__SDCPP__EXTRA_ARGS, split shell-style).
 # engines.sdcpp.extra_args = ["--model-args", "qwen_image_2_1_prefix_cache=false"]
+
+# Quantization for the mlx engine's QwenImage21: "4", "8" (default) or "none" (bf16)
+# (env: LIG_ENGINES__MLX__QUANTIZE).
+# engines.mlx.quantize = "8"
 
 # Sampling steps.
 # steps = 40

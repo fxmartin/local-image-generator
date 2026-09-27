@@ -8,7 +8,7 @@ remote engine served by another of your hosts over the tailnet.
 Inspired by Hao Yu's
 [Qwen-Image-2.1 Turned My Two Little Computers Into an Art Department](https://medium.com/generative-ai/qwen-image-2-1-turned-my-two-little-computers-into-an-art-department-no-cloud-required-29494e26f340).
 
-Status: pre-alpha. Local engines work; MLX and generating through `lig serve` are later phases. Design docs:
+Status: pre-alpha. Local engines work; generating through `lig serve` is a later phase. Design docs:
 [`REQUIREMENTS.md`](./REQUIREMENTS.md), [`docs/STORIES.md`](./docs/STORIES.md),
 [`CLAUDE.md`](./CLAUDE.md). Full flag and config reference: [`docs/reference.md`](./docs/reference.md).
 
@@ -75,6 +75,19 @@ them. Expected `lig doctor` row: `sdcpp ... available`, and `Metal  yes` in the 
 Then `lig generate "a fox"` renders 1024x1024 by default. Record timings with
 `lig bench --engines sdcpp`; they land in `docs/bench/m3max.md`. sd.cpp's Metal path is known
 to be slow on large matrices, so correctness, not speed, is the bar for this engine.
+
+### mflux, MLX (macOS, Apple Silicon)
+
+Runs in-process, no binary to build, so it also supports warm `lig serve` (section 4).
+
+```sh
+uv tool install ".[mlx]"
+```
+
+No `lig models pull` step: mflux downloads `Qwen/Qwen-Image-2.1` itself on first
+`lig generate --engine mlx`, into `models_dir/mflux`. Expected `lig doctor` row: `mlx ...
+available`. Quantize with `engines.mlx.quantize` (details: `docs/reference.md`); edit is not
+implemented yet.
 
 ### qwenimage-ncnn-vulkan (Linux, release binary)
 
@@ -201,7 +214,7 @@ An in-process (warm) engine stays loaded between jobs, so a second job within th
 reports `load_s ≈ 0`; after `--idle-ttl` seconds (default `serve.idle_ttl` = 600) with no job it
 is unloaded and `health` shows `loaded: false`. `--idle-ttl 0` unloads after every job.
 Subprocess engines (sd.cpp, ncnn) cannot stay warm: `health` reports `warm: "unsupported"` and
-the TTL is a no-op. Warm serving arrives with the MLX engine (Epic-07).
+the TTL is a no-op. The in-process MLX engine (section 2) reports `warm: "supported"`.
 
 ### Photo series (`lig-series`)
 

@@ -55,7 +55,9 @@ def generate(
     size: str | None = typer.Option(None, "--size", help="WIDTHxHEIGHT, multiples of 32."),
     steps: int | None = typer.Option(None, "--steps", help="Sampling steps."),
     seed: int | None = typer.Option(None, "--seed", help="Seed; random (and recorded) if omitted."),
-    engine: str | None = typer.Option(None, "--engine", help="Engine: auto, sdcpp, ncnn, fake."),
+    engine: str | None = typer.Option(
+        None, "--engine", help="Engine: auto, sdcpp, ncnn, mlx, fake or remote."
+    ),
     host: str | None = typer.Option(None, "--host", help=HOST_HELP),
     out: Path | None = typer.Option(None, "--out", help="Output directory."),  # noqa: B008
     negative: str | None = typer.Option(None, "--negative", help="Negative prompt."),

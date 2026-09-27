@@ -487,6 +487,21 @@ def test_failed_job_still_unloads_with_ttl_zero(tmp_path):
     assert backend.loaded is False
 
 
+def test_mlx_reports_warm_supported_and_unload_releases_the_model(tmp_path):
+    from lig.backends.mlx import MlxBackend
+    from tests.test_mlx import FakeQwenImage21
+
+    backend = MlxBackend(
+        models_dir=tmp_path, platform="darwin", machine="arm64", model_cls=FakeQwenImage21
+    )
+    _, client = _warm_client(tmp_path, ttl=0, backend=backend)
+    assert client.post("/v1/generate", json=GEN).status_code == 200
+    health = client.get("/v1/health").json()
+    assert health["warm"] == "supported"
+    assert health["loaded"] is False
+    assert backend._model is None
+
+
 def test_cli_serve_passes_idle_ttl(isolated, monkeypatch):
     import uvicorn
 
