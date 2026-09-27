@@ -15,10 +15,14 @@ env vars, e.g. `LIG_SERVE__BIND`.
 - `engines.sdcpp.extra_args` (list of strings; env `LIG_ENGINES__SDCPP__EXTRA_ARGS`, split
   shell-style) is appended verbatim to the `sd-cli` command line, e.g.
   `["--model-args", "qwen_image_2_1_prefix_cache=false"]`.
+- `engines.mlx.quantize` (`"4"`, `"8"` or `"none"`; env `LIG_ENGINES__MLX__QUANTIZE`; default
+  `"8"`) selects mflux's `QwenImage21` quantization; `"none"` runs bf16.
 - `output_dir` and `models_dir` expand a leading `~` to your home directory.
 
 Model weights are cached under the platform cache dir (`~/.cache/lig/models` on Linux);
-override with `LIG_MODELS_DIR` or `models_dir`. The directory is created on first use.
+override with `LIG_MODELS_DIR` or `models_dir`. The directory is created on first use. The `mlx`
+engine is the exception: it is not in the registry, so `lig models pull`/`list`/`prune` do not
+see it; mflux downloads `Qwen/Qwen-Image-2.1` itself into `models_dir/mflux` on first use.
 
 `lig models list [--engine sdcpp] [--json]` shows each artifact's name, role, engines, size,
 license and status (`installed`, `missing`, `partial` = a `.part` file exists, `unverified` =
@@ -53,8 +57,9 @@ entry records its license and the engine build it was measured with (`pinned_eng
 transformer, VAE and ncnn files are under the Qwen Research License (research/evaluation use
 only), not Apache-2.0. The 2.1 VAE is not interchangeable with earlier Qwen-Image VAEs.
 
-Keys: `engine`, `output_dir`, `models_dir`, `default_host`, `hosts.NAME` (a `[hosts]` table of `NAME = "http://host:port"`), `ncnn_binary`, `ncnn_model_dir`, `steps`, `size`, `serve.bind`.
+Keys: `engine`, `output_dir`, `models_dir`, `default_host`, `hosts.NAME` (a `[hosts]` table of `NAME = "http://host:port"`), `ncnn_binary`, `ncnn_model_dir`, `steps`, `size`, `serve.bind`, `engines.sdcpp.extra_args`, `engines.mlx.quantize`.
 The `ncnn` engine needs `ncnn_binary` (or `qwenimage-ncnn-vulkan` on `PATH`) and `ncnn_model_dir` (the `qwenimage21/` folder); it prints no per-step progress, so expect a spinner with elapsed time.
+The `mlx` engine (macOS arm64 only, needs the `mlx` extra) runs mflux's `QwenImage21` in-process and keeps it warm between `lig serve` jobs; `lig edit --engine mlx` is not implemented yet.
 
 ## Editing
 

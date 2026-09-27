@@ -28,8 +28,6 @@ from lig.models.registry import Registry, RegistryError
 # Story 02.1-004: what the XPS can render in reasonable time; only applied when nothing else says.
 LINUX_LOCAL_SIZE = "768x768"
 LINUX_LOCAL_STEPS = 30
-# Engines the config accepts that this build cannot run yet.
-PLANNED_ENGINES = ("mlx",)
 
 
 class UsageError(ValueError):
@@ -199,11 +197,9 @@ def resolve_host(settings: cfg.Settings, host: str | None) -> tuple[str, str]:
 def make_backend(
     name: str, settings: cfg.Settings, *, verbose: bool = False, host: str | None = None
 ) -> Backend:
-    """Instantiate the named engine; unknown or not-yet-built engines raise."""
+    """Instantiate the named engine; an unknown name raises."""
     if name == "remote":
         return RemoteBackend(*resolve_host(settings, host))
-    if name in PLANNED_ENGINES:
-        raise EngineUnavailable(f"engine '{name}' is not available in this build yet")
     if name not in BACKENDS:
         raise UsageError(f"unknown engine '{name}'; known engines: {', '.join(sorted(BACKENDS))}")
     if name == "sdcpp":
@@ -216,6 +212,10 @@ def make_backend(
     if name == "ncnn":
         return get_backend(
             name, binary=settings.ncnn_binary, model_dir=settings.ncnn_model_dir, verbose=verbose
+        )
+    if name == "mlx":
+        return get_backend(
+            name, models_dir=settings.models_dir, quantize=settings.engines.mlx.quantize
         )
     return get_backend(name)
 
