@@ -60,11 +60,15 @@ With `--host` the image is uploaded to the server; the sidecar's `source_path` s
 
 ## Generating
 
-`lig generate PROMPT [--size WxH] [--steps N] [--seed S] [--engine E] [--host NAME] [--out DIR] [--negative TEXT] [--guidance G] [--force] [--quiet]`
+`lig generate PROMPT [--size WxH] [--steps N] [--seed S] [--engine E] [--host NAME] [--out DIR] [--negative TEXT] [--guidance G] [--transparent] [--force] [--quiet]`
 writes a PNG and a JSON sidecar to `./outputs` (or `--out` / `output_dir`) and prints the PNG path
 as its last line. Flags override `LIG_*` env, which overrides `config.toml`. On Linux, with no
 `--size`/`--steps` flag or config value, it uses 768x768 and 30 steps (the XPS local fallback).
 `--engine fake` renders a seeded gradient without weights.
+`--transparent` writes an RGBA PNG with a transparent background: on `sdcpp` it wraps the prompt
+in Qwen-Image-2.1's documented alpha form (`This is an RGBA image with transparency. PROMPT. The
+image has alpha channel and the background is transparent.`). Engines without alpha support (`ncnn`)
+exit 4; the sidecar records `transparent`.
 
 Progress goes to stderr: on a terminal, a bar with `step 12/40`, elapsed and ETA (a spinner with
 elapsed time for `ncnn`, which reports no steps), then load and total times. When stdout is not a

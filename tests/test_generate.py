@@ -234,3 +234,32 @@ def test_cli_non_tty_plain_progress_and_path_last():
     assert result.exit_code == 0, result.output
     assert "step" in result.output and "\x1b" not in result.output
     assert result.output.strip().splitlines()[-1].endswith(".png")
+
+
+def test_transparent_recorded_in_sidecar_and_png_is_rgba(tmp_path):
+    result = runner.invoke(
+        app, ["generate", "a fox logo", "--engine", "fake", "--size", "256x256", "--transparent"]
+    )
+    assert result.exit_code == 0, result.output
+    png = next(Path("outputs").glob("*.png"))
+    assert json.loads(png.with_suffix(".json").read_text())["transparent"] is True
+    with Image.open(png) as img:
+        assert img.mode == "RGBA"
+
+
+def test_sidecar_records_transparent_false_by_default(tmp_path):
+    runner.invoke(app, ["generate", "x", "--engine", "fake", "--size", "256x256"])
+    sidecar = json.loads(next(Path("outputs").glob("*.json")).read_text())
+    assert sidecar["transparent"] is False
+
+
+def test_transparent_on_unsupporting_engine_exits_4_with_reason(monkeypatch):
+    class Opaque(FakeBackend):
+        def capabilities(self):
+            return super().capabilities().model_copy(update={"supports_transparent": False})
+
+    monkeypatch.setattr(run, "make_backend", lambda *a, **k: Opaque())
+    result = runner.invoke(app, ["generate", "x", "--engine", "fake", "--transparent"])
+    assert result.exit_code == 4
+    assert "cannot render transparent" in result.output
+    assert not list(Path(".").glob("outputs/*.png"))

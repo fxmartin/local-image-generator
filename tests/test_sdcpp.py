@@ -1,6 +1,8 @@
+import io
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 from lig.backends.base import EngineError, WeightsMissing
 from lig.backends.sdcpp import SdcppBackend
@@ -73,6 +75,24 @@ def test_negative_prompt_passed(backend, read_stub_argv):
     assert _flag(_generate_argv(read_stub_argv), "-n") == "blurry"
 
 
+def test_transparent_wraps_prompt_in_documented_alpha_format(backend, read_stub_argv):
+    result = backend.generate(GenerateRequest(prompt="a fox logo", transparent=True), None)
+    prompt = _flag(_generate_argv(read_stub_argv), "-p")
+    assert prompt == (
+        "This is an RGBA image with transparency. a fox logo. "
+        "The image has alpha channel and the background is transparent."
+    )
+    with Image.open(io.BytesIO(result.png)) as img:
+        alphas = img.getdata(3)
+    assert img.mode == "RGBA"
+    assert any(a < 255 for a in alphas)
+
+
+def test_without_transparent_prompt_is_unchanged(backend, read_stub_argv):
+    backend.generate(GenerateRequest(prompt="a fox logo"), None)
+    assert _flag(_generate_argv(read_stub_argv), "-p") == "a fox logo"
+
+
 def test_edit_adds_mmproj_and_reference(backend, models_dir, tmp_path, read_stub_argv):
     reference = tmp_path / "ref.png"
     reference.write_bytes(b"png")
@@ -104,6 +124,7 @@ def test_available_ok(backend):
     result = backend.available()
     assert result.ok and result.reason == ""
     assert backend.capabilities().supports_edit
+    assert backend.capabilities().supports_transparent
 
 
 def test_available_reports_missing_mmproj_but_still_ok(models_dir, tmp_path, stub_bin_dir):

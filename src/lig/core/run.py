@@ -93,6 +93,7 @@ def build_request(
     seed: int | None = None,
     negative: str | None = None,
     guidance: float | None = None,
+    transparent: bool = False,
 ) -> GenerateRequest:
     if not prompt.strip():
         raise UsageError("the prompt must not be empty")
@@ -104,6 +105,7 @@ def build_request(
         "steps": steps,
         "negative_prompt": negative,
         "guidance": guidance,
+        "transparent": transparent,
     }
     if seed is not None:
         fields["seed"] = seed

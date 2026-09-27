@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Stub `sd-cli`: echo argv, print fake progress, write a tiny PNG to `-o`.
+"""Stub `sd-cli`: echo argv, print fake progress, write a tiny PNG to `-o` (RGBA with a
+varying alpha when the prompt carries the transparent form).
 
 Env: STUB_ARGV_FILE (append argv as a JSON line), STUB_FAIL=1 (stderr + exit 2),
 STUB_SLEEP=<seconds> (delay before doing work), STUB_VERSION=<banner> for `--version`.
@@ -45,7 +46,13 @@ def main(argv: list[str]) -> int:
 
     from PIL import Image
 
-    Image.new("RGB", (64, 64), (32, 96, 160)).save(out, format="PNG")
+    prompt = argv[argv.index("-p") + 1] if "-p" in argv else ""
+    if "alpha channel" in prompt:  # the adapter's transparent prompt form
+        image = Image.new("RGBA", (64, 64), (32, 96, 160, 255))
+        image.putalpha(Image.linear_gradient("L").resize((64, 64)))
+        image.save(out, format="PNG")
+    else:
+        Image.new("RGB", (64, 64), (32, 96, 160)).save(out, format="PNG")
     return 0
 
 
