@@ -93,6 +93,15 @@ def test_without_transparent_prompt_is_unchanged(backend, read_stub_argv):
     assert _flag(_generate_argv(read_stub_argv), "-p") == "a fox logo"
 
 
+def test_transparent_does_not_double_up_trailing_period(backend, read_stub_argv):
+    backend.generate(GenerateRequest(prompt="a fox logo.", transparent=True), None)
+    prompt = _flag(_generate_argv(read_stub_argv), "-p")
+    assert prompt == (
+        "This is an RGBA image with transparency. a fox logo. "
+        "The image has alpha channel and the background is transparent."
+    )
+
+
 def test_edit_adds_mmproj_and_reference(backend, models_dir, tmp_path, read_stub_argv):
     reference = tmp_path / "ref.png"
     reference.write_bytes(b"png")
