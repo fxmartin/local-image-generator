@@ -32,6 +32,12 @@ DEFAULT_GUIDANCE = 1.0
 DEFAULT_SAMPLER = "euler"
 UNKNOWN_VERSION = "unknown"
 VERSION_TIMEOUT_S = 10
+# Qwen-Image-2.1 decides alpha from the prompt, not a flag (docs/qwen_image_2.1.md, "Alpha
+# channel"); sd-cli keeps it because the output is PNG.
+ALPHA_PROMPT = (
+    "This is an RGBA image with transparency. {prompt}. "
+    "The image has alpha channel and the background is transparent."
+)
 
 # The one place sd-cli flag names live (docs/qwen_image_2.1.md at the pinned sd.cpp commit),
 # so an upstream rename is a one-line fix.
@@ -130,7 +136,7 @@ class SdcppBackend:
         available = self.available()
         return Capabilities(
             supports_edit=available.ok and available.reason == "",
-            supports_transparent=False,  # Epic-07
+            supports_transparent=True,
             platforms=PLATFORMS,
         )
 
@@ -194,12 +200,15 @@ class SdcppBackend:
             return str(self._models_dir / weights[role].filename)
 
         guidance = DEFAULT_GUIDANCE if request.guidance is None else request.guidance
+        prompt = request.prompt
+        if request.transparent:
+            prompt = ALPHA_PROMPT.format(prompt=prompt.strip().rstrip("."))
         argv = [
             binary,
             FLAGS["diffusion_model"], path("transformer"),
             FLAGS["vae"], path("vae"),
             FLAGS["llm"], path("text_encoder"),
-            FLAGS["prompt"], request.prompt,
+            FLAGS["prompt"], prompt,
             FLAGS["width"], str(request.width),
             FLAGS["height"], str(request.height),
             FLAGS["steps"], str(request.steps),

@@ -28,6 +28,7 @@ class SidecarSchema(BaseModel):
     steps: int
     size: tuple[int, int]
     guidance: float | None
+    transparent: bool = False
     engine: str
     engine_version: str
     weights: list[WeightsUsed]
@@ -60,6 +61,7 @@ def sidecar_for(
         steps=req.steps,
         size=(req.width, req.height),
         guidance=req.guidance,
+        transparent=req.transparent,
         engine=result.engine,
         engine_version=result.engine_version,
         weights=result.weights,

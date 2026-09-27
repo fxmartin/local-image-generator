@@ -60,6 +60,9 @@ def generate(
     out: Path | None = typer.Option(None, "--out", help="Output directory."),  # noqa: B008
     negative: str | None = typer.Option(None, "--negative", help="Negative prompt."),
     guidance: float | None = typer.Option(None, "--guidance", help="Guidance scale."),
+    transparent: bool = typer.Option(
+        False, "--transparent", help="RGBA PNG with a transparent background (sdcpp, fake)."
+    ),
     force: bool = typer.Option(False, "--force", help="Run even if memory looks too tight."),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Print only the final path."),
 ) -> None:
@@ -76,6 +79,7 @@ def generate(
             seed=seed,
             negative=negative,
             guidance=guidance,
+            transparent=transparent,
         )
     except (cfg.ConfigError, run.UsageError) as exc:
         raise _fail(str(exc), EXIT_USAGE) from exc
@@ -86,6 +90,12 @@ def generate(
         typer.echo(f"warning: {warning}", err=True)
 
     backend, engine_name = open_backend(ctx, settings, host)
+    if transparent and not backend.capabilities().supports_transparent:
+        raise _fail(
+            f"engine '{engine_name}' cannot render transparent output; "
+            "use --engine sdcpp\nrun `lig doctor` for details",
+            EXIT_UNAVAILABLE,
+        )
 
     try:
         figures = run.estimate_memory(load_registry(), engine_name, request)
