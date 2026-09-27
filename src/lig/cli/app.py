@@ -146,19 +146,34 @@ def models_list(
 @models_app.command("pull")
 def models_pull(
     name: str | None = typer.Argument(None, help="Artifact name to download."),
-    engine: str | None = typer.Option(None, "--engine", help="Download this engine's full set."),
+    engine: str | None = typer.Option(
+        None, "--for", "--engine", help="Download the set this engine needs on this platform."
+    ),
+    quant: str | None = typer.Option(
+        None, "--quant", help="Pick the engine's set with this quantization (default: registry's)."
+    ),
     force: bool = typer.Option(
         False, "--force", help="Re-download verified files and skip the free-disk check."
     ),
 ) -> None:
     """Download weights with resume, progress and sha256 verification."""
     if (name is None) == (engine is None):
-        typer.echo("error: give exactly one of NAME or --engine", err=True)
+        typer.echo("error: give exactly one of NAME or --for ENGINE", err=True)
+        raise typer.Exit(2)
+    if quant is not None and engine is None:
+        typer.echo("error: --quant needs --for ENGINE", err=True)
         raise typer.Exit(2)
     err = Console(stderr=True, soft_wrap=True)
     try:
         registry = load_registry()
-        artifacts = registry.set_for(engine, sys.platform) if engine else [registry.get(name)]
+        if engine:
+            _check_engine_set(registry, engine, quant)
+            set_name, chosen = registry.select_set(engine, sys.platform, quant)
+            origin = "" if quant else ", registry default"
+            typer.echo(f"set: {set_name} (quant {chosen.quant or 'n/a'}{origin})")
+            artifacts = registry.set_for(engine, sys.platform, quant)
+        else:
+            artifacts = [registry.get(name)]
         models_dir = cache.ensure_models_dir(cfg.load_settings().settings.models_dir)
     except (cfg.ConfigError, RegistryError, OSError) as exc:
         typer.echo(f"error: {exc}", err=True)
@@ -205,6 +220,26 @@ def models_pull(
     except (downloader.DownloadError, OSError) as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(1) from exc
+
+
+def _check_engine_set(registry: Any, engine: str, quant: str | None) -> None:
+    """Exit 2 when the engine has no set on this platform or no set with ``quant``."""
+    sets = registry.platform_sets(sys.platform, engine)
+    if not sets:
+        typer.echo(
+            f"error: unsupported platform: engine '{engine}' has no artifact set "
+            f"for '{sys.platform}'",
+            err=True,
+        )
+        raise typer.Exit(2)
+    quants = [s.quant for s in sets.values() if s.quant]
+    if quant is not None and quant not in quants:
+        typer.echo(
+            f"error: engine '{engine}' has no '{quant}' set here; choose one of: "
+            + ", ".join(quants),
+            err=True,
+        )
+        raise typer.Exit(2)
 
 
 def _load_cache() -> tuple[Any, Path, cfg.Settings]:
@@ -294,6 +329,40 @@ def models_rm(
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(1) from exc
     typer.echo(f"removed {name} ({size})")
+
+
+@models_app.command("prune")
+def models_prune(
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip the confirmation prompt."),
+) -> None:
+    """Delete cached artifacts that belong to no engine set for this platform."""
+    registry, models_dir, _ = _load_cache()
+    wanted = {n for s in registry.platform_sets(sys.platform).values() for n in s.artifacts}
+    orphans = [
+        (artifact, files)
+        for artifact in registry.artifacts
+        if artifact.name not in wanted and (files := cache.artifact_files(models_dir, artifact))
+    ]
+    if not orphans:
+        typer.echo("nothing to prune")
+        return
+    total = 0
+    for artifact, files in orphans:
+        size = sum(f.stat().st_size for f in files)
+        total += size
+        typer.echo(f"{artifact.name} ({cache.human_size(size)})")
+    if not yes and not typer.confirm(
+        f"Delete {len(orphans)} artifact(s) ({cache.human_size(total)})?"
+    ):
+        raise typer.Exit(1)
+    try:
+        for _artifact, files in orphans:
+            for path in files:
+                path.unlink()
+    except OSError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(1) from exc
+    typer.echo(f"pruned {len(orphans)} artifact(s) ({cache.human_size(total)})")
 
 
 @models_app.command("path")

@@ -266,6 +266,7 @@ sets:
   # Default for sd.cpp: first set listed for the engine.
   sdcpp-q4:
     engine: sdcpp
+    quant: q4
     artifacts:
       - qwen-image-2.1-q4-transformer
       - qwen-image-2.1-text-encoder
@@ -274,6 +275,7 @@ sets:
   # Alternative: higher-fidelity transformer, same encoder/VAE/mmproj.
   sdcpp-q8:
     engine: sdcpp
+    quant: q8
     artifacts:
       - qwen-image-2.1-q8-transformer
       - qwen-image-2.1-text-encoder
@@ -282,6 +284,7 @@ sets:
   # Full-precision ncnn model folder; unpacks to <models_dir>/qwenimage21/.
   ncnn-bf16:
     engine: ncnn
+    quant: bf16
     artifacts:
       - ncnn-processor-merges-txt
       - ncnn-processor-vocab-txt

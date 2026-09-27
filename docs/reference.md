@@ -24,7 +24,12 @@ override with `LIG_MODELS_DIR` or `models_dir`. The directory is created on firs
 license and status (`installed`, `missing`, `partial` = a `.part` file exists, `unverified` =
 present without a `.sha256.ok` marker), plus total cache size and free disk.
 
-`lig models pull [NAME | --engine E] [--force]` downloads weights into the cache. It prints the
+`lig models pull [NAME | --for ENGINE [--quant Q]] [--force]` downloads weights into the cache.
+`--for` (alias `--engine`) pulls exactly the set that engine needs on this platform: the registry
+default (the first set listed, named in the output as `set: sdcpp-q4 (quant q4, registry default)`)
+or, with `--quant q8`, the matching alternative. An engine with no set for this platform (e.g.
+`--for mlx` on Linux) exits 2 with `unsupported platform`; an unknown `--quant` exits 2 listing the
+choices. It prints the
 total bytes to fetch and the free disk first, and refuses if free disk is under total + 2 GB
 (`--force` overrides). Interrupted downloads resume from the `.part` file with an HTTP `Range`
 request (a server that ignores it triggers a warning and a restart from zero). The sha256 is
@@ -38,6 +43,8 @@ and the command exits 1. `lig models rm NAME [--yes]` deletes the artifact and a
 `.corrupt` leftovers after a confirmation showing the size, and warns first if the configured
 default engine needs it. `lig models path NAME` prints the absolute path of an installed
 artifact; if it is not installed it prints nothing and exits 1.
+`lig models prune [--yes]` lists cached artifacts that belong to no engine set for this platform
+(retired or other-platform weights) with their sizes and deletes them after one confirmation.
 
 The shipped registry seeds three sets: `sdcpp-q4` (default: Q4_K transformer, Qwen3-VL-8B Q4_K_M
 text encoder, 2.1 VAE, mmproj), `sdcpp-q8` (Q8_0 transformer instead; opt-in alternative) and
