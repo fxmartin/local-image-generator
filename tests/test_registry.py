@@ -134,3 +134,30 @@ def test_malformed_yaml_and_missing_file(tmp_path):
     top.write_text("- 1")
     with pytest.raises(RegistryError):
         load_registry(top)
+
+
+def test_quant_selects_alternative_set(tmp_path):
+    arts = _three() + [_artifact("t8", "transformer")]
+    sets = (
+        "sdcpp-q4:\n  engine: sdcpp\n  quant: q4\n  artifacts: [t, e, v]\n"
+        "sdcpp-q8:\n  engine: sdcpp\n  quant: q8\n  artifacts: [t8, e, v]\n"
+    )
+    reg = load_registry(_write(tmp_path, arts, sets))
+    assert reg.select_set("sdcpp", "linux")[0] == "sdcpp-q4"
+    assert reg.select_set("sdcpp", "linux", "q8")[0] == "sdcpp-q8"
+    assert [a.name for a in reg.set_for("sdcpp", "linux", "q8")] == ["t8", "e", "v"]
+    with pytest.raises(RegistryError, match="q2"):
+        reg.set_for("sdcpp", "linux", "q2")
+
+
+def test_platform_sets_filters_by_platform_and_engine(tmp_path):
+    arts = _three() + [_artifact("b", "bundle", engines=["mlx"])]
+    sets = (
+        "sdcpp-q4:\n  engine: sdcpp\n  artifacts: [t, e, v]\n"
+        "mlx-q8:\n  engine: mlx\n  platforms: [darwin]\n  artifacts: [b]\n"
+    )
+    reg = load_registry(_write(tmp_path, arts, sets))
+    assert list(reg.platform_sets("linux")) == ["sdcpp-q4"]
+    assert list(reg.platform_sets("darwin")) == ["sdcpp-q4", "mlx-q8"]
+    assert list(reg.platform_sets("darwin", "mlx")) == ["mlx-q8"]
+    assert reg.platform_sets("linux", "mlx") == {}

@@ -43,6 +43,8 @@ class ArtifactSet(BaseModel):
     engine: str = Field(min_length=1)
     platforms: list[str] | None = None  # None: every platform
     artifacts: list[str] = Field(min_length=1)
+    # Selector for `lig models pull --for ENGINE --quant Q` among an engine's sets.
+    quant: str = ""
 
 
 class EngineMemory(BaseModel):
@@ -63,24 +65,40 @@ class Registry(BaseModel):
                 return artifact
         raise RegistryError(f"unknown artifact '{name}'")
 
-    def set_for(self, engine: str, platform: str) -> list[Artifact]:
+    def platform_sets(self, platform: str, engine: str | None = None) -> dict[str, ArtifactSet]:
+        """Sets usable on ``platform`` (optionally for one engine), in registry order."""
+        return {
+            name: s
+            for name, s in self.sets.items()
+            if (engine is None or s.engine == engine)
+            and (s.platforms is None or platform in s.platforms)
+        }
+
+    def select_set(
+        self, engine: str, platform: str, quant: str | None = None
+    ) -> tuple[str, ArtifactSet]:
+        """The engine's first set on ``platform`` (the default), or the one matching ``quant``."""
+        for set_name, artifact_set in self.platform_sets(platform, engine).items():
+            if quant is None or artifact_set.quant == quant:
+                return set_name, artifact_set
+        wanted = f" with quant '{quant}'" if quant else ""
+        raise RegistryError(
+            f"no artifact set for engine '{engine}'{wanted} on platform '{platform}'"
+        )
+
+    def set_for(self, engine: str, platform: str, quant: str | None = None) -> list[Artifact]:
         """Ordered artifacts ``engine`` needs on ``platform``; raises if a role is missing."""
-        for set_name, artifact_set in self.sets.items():
-            if artifact_set.engine != engine:
-                continue
-            if artifact_set.platforms is not None and platform not in artifact_set.platforms:
-                continue
-            resolved = [self.get(name) for name in artifact_set.artifacts]
-            roles = {a.role for a in resolved}
-            if "bundle" not in roles:
-                missing = [r for r in _REQUIRED_ROLES if r not in roles]
-                if missing:
-                    raise RegistryError(
-                        f"set '{set_name}' for engine '{engine}' is missing role(s): "
-                        + ", ".join(missing)
-                    )
-            return resolved
-        raise RegistryError(f"no artifact set for engine '{engine}' on platform '{platform}'")
+        set_name, artifact_set = self.select_set(engine, platform, quant)
+        resolved = [self.get(name) for name in artifact_set.artifacts]
+        roles = {a.role for a in resolved}
+        if "bundle" not in roles:
+            missing = [r for r in _REQUIRED_ROLES if r not in roles]
+            if missing:
+                raise RegistryError(
+                    f"set '{set_name}' for engine '{engine}' is missing role(s): "
+                    + ", ".join(missing)
+                )
+        return resolved
 
 
 def _describe(errors: list, raw: dict) -> str:

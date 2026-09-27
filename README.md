@@ -89,7 +89,7 @@ unzip qwenimage-ncnn-vulkan-20260924-linux.zip
 install -Dm755 qwenimage-ncnn-vulkan-20260924-linux/qwenimage-ncnn-vulkan ~/.local/bin/qwenimage-ncnn-vulkan
 ```
 
-Its ~31 GB model folder is pulled with `lig models pull --engine ncnn`; point `lig` at it with
+Its ~31 GB model folder is pulled with `lig models pull --for ncnn`; point `lig` at it with
 `ncnn_model_dir` (or `LIG_NCNN_MODEL_DIR`) set to the `qwenimage21/` folder inside your models
 cache. Expected `lig doctor` row: `ncnn   ...   available`.
 
@@ -97,7 +97,7 @@ cache. Expected `lig doctor` row: `ncnn   ...   available`.
 
 ```sh
 lig models list                    # what exists, sizes, licenses, cache size, free disk
-lig models pull --engine sdcpp     # Q4_K transformer, Qwen3-VL text encoder, VAE, mmproj
+lig models pull --for sdcpp        # Q4_K transformer, Qwen3-VL text encoder, VAE, mmproj
 lig doctor                         # the sdcpp row should now read `available`
 ```
 
@@ -158,10 +158,11 @@ Fixed prompt and seed per engine; prints load time, s/step, total and peak RSS, 
 
 ```sh
 lig models list
-lig models pull --engine sdcpp     # or: lig models pull qwen-image-2.1-q8-transformer
+lig models pull --for sdcpp        # the default set; --quant q8 for the Q8_0 alternative
 lig models verify                  # re-hash everything installed
 lig models rm qwen-image-2.1-q8-transformer --yes
 lig models path qwen-image-2.1-vae
+lig models prune                   # delete weights no engine set here needs
 ```
 
 Exit codes: 0 ok; 1 on a sha256 mismatch, a failed or refused download (not enough disk), or

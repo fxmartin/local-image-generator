@@ -88,3 +88,11 @@ def test_ncnn_bundle_set(reg):
     assert 31.0e9 < sum(a.size_bytes for a in bundle) < 31.4e9  # 31.19 GB per the bench doc
     assert all("20260924" in a.pinned_engine for a in bundle)
     assert all(a.license == "qwen-research" for a in bundle)
+
+
+def test_shipped_sets_name_their_quantization(reg):
+    assert {name: s.quant for name, s in reg.sets.items()} == {
+        "sdcpp-q4": "q4",
+        "sdcpp-q8": "q8",
+        "ncnn-bf16": "bf16",
+    }
