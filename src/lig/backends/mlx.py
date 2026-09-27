@@ -40,8 +40,7 @@ DEFAULT_GUIDANCE = 1.0
 # mflux's own img2img default is None (no denoising skip); lig picks a starting point instead.
 DEFAULT_IMAGE_STRENGTH = 0.6
 EDIT_UNSUPPORTED_REASON = (
-    "mflux's QwenImage21.generate_image has no image_path/image_strength parameters "
-    "at this version"
+    "mflux's QwenImage21.generate_image has no image_path/image_strength parameters at this version"
 )
 # mflux downloads Qwen/Qwen-Image-2.1 itself (docs/reference.md); keep it inside lig's cache.
 CACHE_SUBDIR = "mflux"
