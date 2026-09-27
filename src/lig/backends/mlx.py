@@ -87,6 +87,9 @@ class MlxBackend:
         return self._platform == PLATFORM and self._machine in ARCHS
 
     def _import_model_cls(self) -> type:
+        # mflux reads this once at import time, so it must be set before the first import
+        # (`available()` runs before `_load()`); only set it if the user hasn't.
+        os.environ.setdefault(CACHE_DIR_ENV, str(self._models_dir / CACHE_SUBDIR))
         try:
             from mflux.models.qwen21.variants.txt2img.qwen_image_21 import QwenImage21
         except ImportError as error:
@@ -118,9 +121,6 @@ class MlxBackend:
         if self._model is not None:
             return self._model
         model_cls = self._model_cls or self._import_model_cls()
-        if self._model_cls is None:
-            # mflux reads this once at import time; only set it if the user hasn't.
-            os.environ.setdefault(CACHE_DIR_ENV, str(self._models_dir / CACHE_SUBDIR))
         self._model = model_cls(quantize=_quantize_arg(self._quantize))
         self._model.callbacks.register(self._progress)
         self.loaded = True

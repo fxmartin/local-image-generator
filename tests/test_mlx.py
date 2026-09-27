@@ -4,7 +4,9 @@ mflux is macOS/Apple Silicon only and is never installed in CI, so every test he
 fake model class; the adapter must never import the real `mflux` package during these tests.
 """
 
+import builtins
 import io
+import os
 
 import pytest
 from PIL import Image
@@ -112,11 +114,44 @@ def test_available_ok_when_platform_matches_and_model_is_injected(backend):
     assert backend.available().ok
 
 
-def test_available_reports_missing_mflux_extra(tmp_path):
+def test_available_reports_missing_mflux_extra(tmp_path, monkeypatch):
+    monkeypatch.delenv("MFLUX_CACHE_DIR", raising=False)
     backend = MlxBackend(models_dir=tmp_path, platform="darwin", machine="arm64")
     availability = backend.available()
     assert not availability.ok
     assert "mflux" in availability.reason
+
+
+def _record_cache_dir_on_mflux_import(monkeypatch) -> list[str | None]:
+    """Fail every `mflux` import, noting the MFLUX_CACHE_DIR it would have seen."""
+    seen: list[str | None] = []
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name.startswith("mflux"):
+            seen.append(os.environ.get("MFLUX_CACHE_DIR"))
+            raise ImportError("no mflux here")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    return seen
+
+
+def test_cache_dir_is_set_before_the_first_mflux_import(tmp_path, monkeypatch):
+    # `lig generate` calls `available()` before `_load()`; mflux reads the cache dir at import
+    # time, so the very first import (from `available()`) must already see it.
+    monkeypatch.delenv("MFLUX_CACHE_DIR", raising=False)
+    seen = _record_cache_dir_on_mflux_import(monkeypatch)
+    backend = MlxBackend(models_dir=tmp_path, platform="darwin", machine="arm64")
+    assert not backend.available().ok
+    assert seen == [str(tmp_path / "mflux")]
+
+
+def test_cache_dir_keeps_the_users_own_setting(tmp_path, monkeypatch):
+    monkeypatch.setenv("MFLUX_CACHE_DIR", "/elsewhere")
+    seen = _record_cache_dir_on_mflux_import(monkeypatch)
+    MlxBackend(models_dir=tmp_path, platform="darwin", machine="arm64").available()
+    assert seen == ["/elsewhere"]
 
 
 def test_capabilities_deny_edit_and_transparent(backend):
