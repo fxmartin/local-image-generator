@@ -34,6 +34,7 @@
 #### Stories
 
 ##### Story 09.1-001: Gemma client
+**Status**: Done
 **User Story**: As FX, I want `lig-series` to call the `gemma` command with a system instruction and my request on stdin, and get back only the model's answer, so that planning runs on the M3 Max's local model with no API keys and no cloud.
 **Priority**: Must Have
 **Story Points**: 3
@@ -56,6 +57,7 @@
 **Risk Level**: Low
 
 ##### Story 09.1-002: Global series settings (first `gemma` call)
+**Status**: Done
 **User Story**: As FX, I want one `gemma` call to turn my request into validated global settings (count, character, style, setting, arc), so that "Create 10 photos black and white of a woman in Paris" fixes once what all ten photos share.
 **Priority**: Must Have
 **Story Points**: 5
@@ -83,6 +85,7 @@
 **Risk Level**: Medium
 
 ##### Story 09.1-003: Deterministic prompt composition
+**Status**: Done
 **User Story**: As FX, I want every shot's final prompt built by code from the global settings and that shot's scene, with the character's look copied word for word, so that the image model sees the same identity and style in every photo.
 **Priority**: Must Have
 **Story Points**: 2
@@ -103,6 +106,7 @@
 **Risk Level**: Low
 
 ##### Story 09.1-004: Per-shot scene (one `gemma` call per photo)
+**Status**: Done
 **User Story**: As FX, I want each photo's scene written by its own `gemma` call that knows the series settings, its position in the series and the scenes already used, so that ten photos follow the arc without repeating a location or pose.
 **Priority**: Must Have
 **Story Points**: 3
@@ -132,6 +136,7 @@
 #### Stories
 
 ##### Story 09.2-001: Series runner calling `lig generate`
+**Status**: Done
 **User Story**: As FX, I want `lig-series "Create 10 photos black and white of a woman in Paris"` to run the global call, then loop over the shots (per-shot `gemma` call, compose the prompt, `lig generate`), printing each PNG path, so that one command produces the whole series with my usual `lig` settings.
 **Priority**: Must Have
 **Story Points**: 5
@@ -155,6 +160,7 @@
 **Risk Level**: Medium
 
 ##### Story 09.2-002: Series manifest
+**Status**: Done
 **User Story**: As FX, I want each series directory to contain a `series.json` that ties together the request, the plan, every prompt and seed, and each image with its `lig` sidecar, so that I can reproduce or extend a series later.
 **Priority**: Must Have
 **Story Points**: 2
@@ -177,6 +183,7 @@
 **Risk Level**: Low
 
 ##### Story 09.2-003: Review the plan before rendering
+**Status**: Done
 **User Story**: As FX, I want `--plan-only` to run the global call and all per-shot calls without rendering, and `--from-plan plan.json` to render a plan I have edited, so that I fix a weak scene before spending up to 100 minutes of GPU on it.
 **Priority**: Must Have
 **Story Points**: 3
@@ -197,6 +204,7 @@
 **Risk Level**: Low
 
 ##### Story 09.2-004: Series contact sheet
+**Status**: Done
 **User Story**: As FX, I want a contact sheet of the series, labelled with each shot's title, so that I can judge the character's continuity at a glance.
 **Priority**: Should Have
 **Story Points**: 2
@@ -264,6 +272,7 @@
 **Risk Level**: Medium
 
 ##### Story 09.3-003: Reusable characters across series
+**Status**: Done
 **User Story**: As FX, I want `--character NAME` to save the character's look, name and reference image the first time, and reuse them in every later series, so that the same person appears in all my series, not only within one.
 **Priority**: Must Have
 **Story Points**: 3
@@ -289,6 +298,7 @@
 #### Stories
 
 ##### Story 09.4-001: `lig-series` entry point and docs
+**Status**: Done
 **User Story**: As FX, I want `lig-series` installed by the same `uv tool install` as `lig`, with a README section and `--help`, so that it is one install on the XPS.
 **Priority**: Must Have
 **Story Points**: 2
@@ -312,6 +322,7 @@
 **Risk Level**: Low
 
 ##### Story 09.4-002: Acceptance: two series, one character
+**Status**: Done
 **User Story**: As FX, I want a recorded run of two series with the same saved character, rendered from the XPS on the M3 Max, so that the epic closes on evidence.
 **Priority**: Must Have
 **Story Points**: 2
