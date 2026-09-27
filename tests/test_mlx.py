@@ -59,11 +59,32 @@ class FakeQwenImage21:
         self.callbacks = _FakeCallbacks()
         self.last_kwargs: dict | None = None
 
-    def generate_image(self, **kwargs) -> _FakeGeneratedImage:
-        self.last_kwargs = kwargs
-        config = _FakeConfig(kwargs["num_inference_steps"])
+    def generate_image(
+        self,
+        seed,
+        prompt,
+        num_inference_steps=40,
+        width=1024,
+        height=1024,
+        guidance=1.0,
+        image_path=None,
+        image_strength=None,
+        negative_prompt=None,
+    ) -> _FakeGeneratedImage:
+        self.last_kwargs = {
+            "seed": seed,
+            "prompt": prompt,
+            "num_inference_steps": num_inference_steps,
+            "width": width,
+            "height": height,
+            "guidance": guidance,
+            "image_path": image_path,
+            "image_strength": image_strength,
+            "negative_prompt": negative_prompt,
+        }
+        config = _FakeConfig(num_inference_steps)
         self.callbacks.fire(config)
-        image = Image.new("RGB", (kwargs["width"], kwargs["height"]))
+        image = Image.new("RGB", (width, height))
         return _FakeGeneratedImage(image)
 
 
@@ -72,9 +93,32 @@ class _FailingQwenImage21(FakeQwenImage21):
         raise RuntimeError("boom")
 
 
+class FakeQwenImage21NoEdit:
+    """An older/future mflux `QwenImage21` without img2img support (no `image_path` kwarg)."""
+
+    instances = 0
+
+    def __init__(self, quantize: int | None = None) -> None:
+        FakeQwenImage21NoEdit.instances += 1
+        self.callbacks = _FakeCallbacks()
+
+    def generate_image(
+        self,
+        seed,
+        prompt,
+        num_inference_steps=40,
+        width=1024,
+        height=1024,
+        guidance=1.0,
+        negative_prompt=None,
+    ) -> _FakeGeneratedImage:
+        raise AssertionError("should never be called: capabilities() must gate this")
+
+
 @pytest.fixture(autouse=True)
 def _reset_instance_counter():
     FakeQwenImage21.instances = 0
+    FakeQwenImage21NoEdit.instances = 0
 
 
 @pytest.fixture
@@ -154,11 +198,29 @@ def test_cache_dir_keeps_the_users_own_setting(tmp_path, monkeypatch):
     assert seen == ["/elsewhere"]
 
 
-def test_capabilities_deny_edit_and_transparent(backend):
+def test_capabilities_support_edit_when_generate_image_has_img2img_kwargs(backend):
+    caps = backend.capabilities()
+    assert caps.supports_edit is True
+    assert caps.supports_transparent is False
+    assert caps.platforms == ["darwin"]
+
+
+def test_capabilities_deny_edit_when_engine_lacks_img2img_kwargs(tmp_path):
+    backend = MlxBackend(
+        models_dir=tmp_path, platform="darwin", machine="arm64", model_cls=FakeQwenImage21NoEdit
+    )
     caps = backend.capabilities()
     assert caps.supports_edit is False
     assert caps.supports_transparent is False
-    assert caps.platforms == ["darwin"]
+
+
+def test_available_reports_edit_unsupported_reason_when_engine_lacks_img2img_kwargs(tmp_path):
+    backend = MlxBackend(
+        models_dir=tmp_path, platform="darwin", machine="arm64", model_cls=FakeQwenImage21NoEdit
+    )
+    availability = backend.available()
+    assert availability.ok is True
+    assert availability.reason.startswith("edit unsupported:")
 
 
 def test_generate_produces_png_with_engine_version_and_weights(backend, monkeypatch):
@@ -230,10 +292,61 @@ def test_unload_releases_the_model(backend):
     assert backend._model is None
 
 
-def test_edit_is_not_implemented_yet(backend, tmp_path):
+def test_edit_carries_reference_image_path_and_default_strength(backend, tmp_path):
+    reference = tmp_path / "ref.png"
+    request = EditRequest(
+        prompt="make it orange", reference_image=reference, reference_sha256="a" * 64, steps=2
+    )
+    backend.edit(request, None)
+    assert backend._model.last_kwargs["image_path"] == str(reference)
+    assert backend._model.last_kwargs["image_strength"] == 0.6
+
+
+def test_edit_uses_the_requests_strength_when_given(tmp_path):
+    reference = tmp_path / "ref.png"
+    backend = MlxBackend(
+        models_dir=tmp_path,
+        platform="darwin",
+        machine="arm64",
+        model_cls=FakeQwenImage21,
+        image_strength=0.6,
+    )
+    request = EditRequest(
+        prompt="x", reference_image=reference, reference_sha256="a" * 64, steps=1, strength=0.85
+    )
+    backend.edit(request, None)
+    assert backend._model.last_kwargs["image_strength"] == 0.85
+
+
+def test_edit_uses_the_configured_default_strength(tmp_path):
+    reference = tmp_path / "ref.png"
+    backend = MlxBackend(
+        models_dir=tmp_path,
+        platform="darwin",
+        machine="arm64",
+        model_cls=FakeQwenImage21,
+        image_strength=0.4,
+    )
+    request = EditRequest(prompt="x", reference_image=reference, reference_sha256="a" * 64, steps=1)
+    backend.edit(request, None)
+    assert backend._model.last_kwargs["image_strength"] == 0.4
+
+
+def test_edit_raises_engine_unavailable_when_engine_lacks_img2img_support(tmp_path):
+    reference = tmp_path / "ref.png"
+    backend = MlxBackend(
+        models_dir=tmp_path, platform="darwin", machine="arm64", model_cls=FakeQwenImage21NoEdit
+    )
+    request = EditRequest(prompt="x", reference_image=reference, reference_sha256="a" * 64)
+    with pytest.raises(EngineUnavailable, match="edit unsupported"):
+        backend.edit(request, None)
+
+
+def test_edit_raises_engine_unavailable_on_the_wrong_platform(tmp_path):
+    backend = MlxBackend(models_dir=tmp_path, platform="linux", machine="x86_64")
     reference = tmp_path / "ref.png"
     request = EditRequest(prompt="x", reference_image=reference, reference_sha256="a" * 64)
-    with pytest.raises(EngineUnavailable):
+    with pytest.raises(EngineUnavailable, match=UNAVAILABLE_REASON):
         backend.edit(request, None)
 
 
@@ -243,3 +356,10 @@ def test_make_backend_wires_models_dir_and_quantize(tmp_path):
     assert isinstance(built, MlxBackend)
     assert built._models_dir == tmp_path
     assert built._quantize == "4"
+
+
+def test_make_backend_wires_image_strength(tmp_path):
+    settings = cfg.Settings(models_dir=tmp_path, engines={"mlx": {"image_strength": 0.75}})
+    built = run.make_backend("mlx", settings)
+    assert isinstance(built, MlxBackend)
+    assert built._image_strength == 0.75

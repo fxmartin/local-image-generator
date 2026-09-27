@@ -47,6 +47,8 @@ class NcnnSettings(BaseModel):
 class MlxSettings(BaseModel):
     # mflux's `-q`: "4" or "8" bits, or "none" for bf16 (no quantization).
     quantize: str = "8"
+    # mflux's img2img `image_strength` default when `lig edit` doesn't pass `--strength`.
+    image_strength: float = Field(default=0.6, ge=0.0, le=1.0)
 
     @field_validator("quantize", mode="before")
     @classmethod
@@ -265,6 +267,10 @@ CONFIG_TEMPLATE = """\
 # Quantization for the mlx engine's QwenImage21: "4", "8" (default) or "none" (bf16)
 # (env: LIG_ENGINES__MLX__QUANTIZE).
 # engines.mlx.quantize = "8"
+
+# Default mflux img2img strength for `lig edit --engine mlx` when --strength is omitted, 0.0-1.0
+# (env: LIG_ENGINES__MLX__IMAGE_STRENGTH).
+# engines.mlx.image_strength = 0.6
 
 # Sampling steps.
 # steps = 40

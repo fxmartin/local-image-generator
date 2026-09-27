@@ -86,8 +86,8 @@ uv tool install ".[mlx]"
 
 No `lig models pull` step: mflux downloads `Qwen/Qwen-Image-2.1` itself on first
 `lig generate --engine mlx`, into `models_dir/mflux`. Expected `lig doctor` row: `mlx ...
-available`. Quantize with `engines.mlx.quantize` (details: `docs/reference.md`); edit is not
-implemented yet.
+available`. Quantize with `engines.mlx.quantize`; `lig edit --engine mlx` uses mflux's img2img,
+not sdcpp's instruction editing.
 
 ### qwenimage-ncnn-vulkan (Linux, release binary)
 
@@ -141,8 +141,8 @@ Defaults on Linux are 768x768, 30 steps; on macOS 1024x1024, 40 steps. Sizes are
 lig edit outputs/cat.png "make the cat orange" --strength 0.8
 ```
 
-Needs the `mmproj` weight (pulled with the sdcpp set). Exit codes: 0, 1, 2 (unreadable image),
-3, 4 (engine cannot edit).
+Needs the `mmproj` weight (pulled with the sdcpp set); on `mlx` it defaults to
+`engines.mlx.image_strength` (`0.6`). Exit codes: 0, 1, 2 (unreadable image), 3, 4 (engine cannot edit).
 
 ### `lig seeds`
 
