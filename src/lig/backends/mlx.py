@@ -10,6 +10,10 @@ img2img on the same `QwenImage21.generate_image()` used for txt2img (`image_path
 -- that needs the Qwen3-VL vision tower, which upstream mflux does not support yet. `edit()`
 checks the installed `generate_image` signature for both kwargs so a future mflux that drops or
 never gained them degrades to `supports_edit=False` instead of a crash mid-generation.
+
+mlx streams are thread-local, and a warm model's arrays belong to the thread that loaded it: the
+next job on another thread (as `lig serve` gives it) fails with "There is no Stream(cpu, 0) in
+current thread". Every model call therefore runs on one worker thread owned by the backend.
 """
 
 import importlib.metadata
@@ -17,8 +21,12 @@ import inspect
 import io
 import os
 import platform as platform_module
+import queue
 import sys
+import threading
 import time
+from collections.abc import Callable
+from concurrent.futures import Future
 from pathlib import Path
 from typing import Any
 
@@ -77,6 +85,34 @@ class _ProgressBridge:
             self.on_progress(t + 1, config.num_inference_steps)
 
 
+class _PinnedThread:
+    """Runs every submitted call on one daemon thread, so Ctrl-C never waits for a render."""
+
+    def __init__(self) -> None:
+        self._calls: queue.Queue[tuple[Callable[[], Any], Future[Any]]] = queue.Queue()
+        self._thread: threading.Thread | None = None
+        self._start_lock = threading.Lock()
+
+    def _serve(self) -> None:
+        while True:
+            call, future = self._calls.get()
+            try:
+                future.set_result(call())
+            except BaseException as error:  # noqa: BLE001 - re-raised in the caller's thread
+                future.set_exception(error)
+
+    def call(self, fn: Callable[[], Any]) -> Any:
+        with self._start_lock:
+            if self._thread is None:
+                self._thread = threading.Thread(target=self._serve, name="lig-mlx", daemon=True)
+                self._thread.start()
+        if threading.current_thread() is self._thread:
+            return fn()
+        future: Future[Any] = Future()
+        self._calls.put((fn, future))
+        return future.result()
+
+
 class MlxBackend:
     name = ENGINE
     supports_warm = True
@@ -99,12 +135,16 @@ class MlxBackend:
         self._model_cls = model_cls
         self._model: Any | None = None
         self._progress = _ProgressBridge()
+        self._worker = _PinnedThread()
         self.loaded = False
 
     def unload(self) -> None:
         if self.loaded:
-            self._model = None
-            self.loaded = False
+            self._worker.call(self._release)
+
+    def _release(self) -> None:
+        self._model = None
+        self.loaded = False
 
     def _platform_ok(self) -> bool:
         return self._platform == PLATFORM and self._machine in ARCHS
@@ -158,13 +198,13 @@ class MlxBackend:
     def generate(
         self, request: GenerateRequest, on_progress: ProgressCallback | None
     ) -> ImageResult:
-        return self._run(request, on_progress)
+        return self._worker.call(lambda: self._run(request, on_progress))
 
     def edit(self, request: EditRequest, on_progress: ProgressCallback | None) -> ImageResult:
         availability = self.available()
         if not availability.ok or availability.reason:
             raise EngineUnavailable(availability.reason)
-        return self._run(request, on_progress)
+        return self._worker.call(lambda: self._run(request, on_progress))
 
     def _run(self, request: GenerateRequest, on_progress: ProgressCallback | None) -> ImageResult:
         if not self._platform_ok():
