@@ -21,7 +21,9 @@ def edit(
     ),
     steps: int | None = typer.Option(None, "--steps", help="Sampling steps."),
     seed: int | None = typer.Option(None, "--seed", help="Seed; random (and recorded) if omitted."),
-    engine: str | None = typer.Option(None, "--engine", help="Engine: auto, sdcpp, ncnn, fake."),
+    engine: str | None = typer.Option(
+        None, "--engine", help="Engine: auto, sdcpp, ncnn, mlx, fake or remote."
+    ),
     strength: float | None = typer.Option(
         None, "--strength", help="How far to move from the source, 0.0 to 1.0."
     ),

@@ -132,8 +132,8 @@ overrides), **4** engine unavailable (missing binary or weights; the message say
 lig generate "a lovely cat holding a sign that says 'qwen'" --size 768x768 --steps 30 --seed 42
 ```
 
-Defaults on Linux are 768x768, 30 steps; on macOS 1024x1024, 40 steps. Sizes are multiples of
-32. `-q` prints only the path. Exit codes: 0, 1, 2, 3, 4.
+Defaults: Linux 768x768, 30 steps; macOS 1024x1024, 40 steps. Engine `auto` = `default_host` if set,
+else `mlx` on Apple Silicon with the `mlx` extra, else `sdcpp`. Sizes are multiples of 32. `-q` prints only the path. Exit codes: 0, 1, 2, 3, 4.
 
 ### `lig edit`
 

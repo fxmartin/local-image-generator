@@ -29,7 +29,9 @@ def seeds(
     ),
     size: str | None = typer.Option(None, "--size", help="WIDTHxHEIGHT, multiples of 32."),
     steps: int | None = typer.Option(None, "--steps", help="Sampling steps."),
-    engine: str | None = typer.Option(None, "--engine", help="Engine: auto, sdcpp, ncnn, fake."),
+    engine: str | None = typer.Option(
+        None, "--engine", help="Engine: auto, sdcpp, ncnn, mlx, fake or remote."
+    ),
     out: Path | None = typer.Option(None, "--out", help="Output directory."),  # noqa: B008
     negative: str | None = typer.Option(None, "--negative", help="Negative prompt."),
     guidance: float | None = typer.Option(None, "--guidance", help="Guidance scale."),
