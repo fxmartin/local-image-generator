@@ -7,6 +7,7 @@ fake model class; the adapter must never import the real `mflux` package during 
 import builtins
 import io
 import os
+import threading
 
 import pytest
 from PIL import Image
@@ -290,6 +291,60 @@ def test_unload_releases_the_model(backend):
     backend.unload()
     assert backend.loaded is False
     assert backend._model is None
+
+
+class _ThreadRecordingQwenImage21(FakeQwenImage21):
+    """Records which thread loads and runs it: mlx streams are thread-local."""
+
+    threads: list[str] = []
+
+    def __init__(self, quantize: int | None = None) -> None:
+        super().__init__(quantize)
+        _ThreadRecordingQwenImage21.threads.append(f"load:{threading.get_ident()}")
+
+    def generate_image(self, **kwargs) -> _FakeGeneratedImage:
+        _ThreadRecordingQwenImage21.threads.append(f"run:{threading.get_ident()}")
+        return super().generate_image(**kwargs)
+
+
+def test_warm_model_runs_on_the_thread_that_loaded_it_whatever_the_caller(tmp_path):
+    # `lig serve` calls each job from a different thread; mlx then fails with
+    # "There is no Stream(cpu, 0) in current thread" unless every call is pinned to one thread.
+    _ThreadRecordingQwenImage21.threads = []
+    backend = MlxBackend(
+        models_dir=tmp_path,
+        platform="darwin",
+        machine="arm64",
+        model_cls=_ThreadRecordingQwenImage21,
+    )
+
+    def job(prompt: str) -> None:
+        backend.generate(GenerateRequest(prompt=prompt, steps=1), None)
+
+    for prompt in ("a", "b"):
+        caller = threading.Thread(target=job, args=(prompt,))
+        caller.start()
+        caller.join()
+    job("c")
+
+    recorded = _ThreadRecordingQwenImage21.threads
+    assert [entry.split(":")[0] for entry in recorded] == ["load", "run", "run", "run"]
+    assert len({entry.split(":")[1] for entry in recorded}) == 1
+
+
+def test_errors_and_progress_cross_back_to_the_caller(tmp_path):
+    backend = MlxBackend(
+        models_dir=tmp_path, platform="darwin", machine="arm64", model_cls=_FailingQwenImage21
+    )
+    with pytest.raises(EngineError, match="boom"):
+        backend.generate(GenerateRequest(prompt="x", steps=1), None)
+
+    steps: list[tuple[int, int]] = []
+    ok = MlxBackend(
+        models_dir=tmp_path, platform="darwin", machine="arm64", model_cls=FakeQwenImage21
+    )
+    ok.generate(GenerateRequest(prompt="x", steps=2), lambda s, t: steps.append((s, t)))
+    assert steps == [(1, 2), (2, 2)]
 
 
 def test_edit_carries_reference_image_path_and_default_strength(backend, tmp_path):
