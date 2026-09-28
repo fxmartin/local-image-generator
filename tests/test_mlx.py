@@ -347,6 +347,44 @@ def test_errors_and_progress_cross_back_to_the_caller(tmp_path):
     assert steps == [(1, 2), (2, 2)]
 
 
+class _FakeTransformer:
+    """mflux 0.20.0's transformer keeps one compiled step and one geometry per input shape."""
+
+    def __init__(self) -> None:
+        self._step_fn: object | None = None
+        self._geometry_cache: dict[tuple[int, int, int], object] = {}
+
+
+class _ShapeCachingQwenImage21(FakeQwenImage21):
+    def __init__(self, quantize: int | None = None) -> None:
+        super().__init__(quantize)
+        self.transformer = _FakeTransformer()
+
+    def generate_image(self, **kwargs) -> _FakeGeneratedImage:
+        self.transformer._step_fn = object()
+        self.transformer._geometry_cache[(len(kwargs["prompt"]), 64, 64)] = object()
+        return super().generate_image(**kwargs)
+
+
+def test_each_job_drops_the_per_shape_compiled_step_and_geometry(tmp_path):
+    # Each retrace kept ~13 GB alive on the M3 Max: 28 -> 68 GB over four prompts.
+    backend = MlxBackend(
+        models_dir=tmp_path, platform="darwin", machine="arm64", model_cls=_ShapeCachingQwenImage21
+    )
+    for prompt in ("a", "a longer prompt"):
+        backend.generate(GenerateRequest(prompt=prompt, steps=1), None)
+        transformer = backend._model.transformer
+        assert transformer._step_fn is None
+        assert transformer._geometry_cache == {}
+    assert backend.loaded is True
+
+
+def test_job_memory_release_survives_a_model_without_those_internals(backend):
+    backend.generate(GenerateRequest(prompt="a", steps=1), None)
+    backend.generate(GenerateRequest(prompt="b", steps=1), None)
+    assert backend.loaded is True
+
+
 def test_edit_carries_reference_image_path_and_default_strength(backend, tmp_path):
     reference = tmp_path / "ref.png"
     request = EditRequest(

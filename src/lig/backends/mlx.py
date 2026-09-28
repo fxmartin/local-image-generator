@@ -14,6 +14,12 @@ never gained them degrades to `supports_edit=False` instead of a crash mid-gener
 mlx streams are thread-local, and a warm model's arrays belong to the thread that loaded it: the
 next job on another thread (as `lig serve` gives it) fails with "There is no Stream(cpu, 0) in
 current thread". Every model call therefore runs on one worker thread owned by the backend.
+
+mflux 0.20.0's transformer keeps one `mx.compile` trace and one attention geometry per input
+shape (prompt length x resolution) for the model's lifetime; each trace held ~13 GB on the M3
+Max, so a warm `lig serve` grew 28 -> 68 GB over four prompts until macOS killed it. After every
+job the adapter drops both (the next job simply re-traces) and clears mlx's
+buffer cache, which kept the process flat at 15 GB between jobs.
 """
 
 import importlib.metadata
@@ -72,6 +78,24 @@ def _supports_image_edit(model_cls: type) -> bool:
     except (TypeError, ValueError):
         return False
     return "image_path" in params and "image_strength" in params
+
+
+def _release_job_memory(model: Any) -> None:
+    """Drop mflux's per-shape compiled step and geometry, then mlx's buffer cache.
+
+    These are private mflux internals, so a version without them is simply left alone.
+    """
+    transformer = getattr(model, "transformer", None)
+    if hasattr(transformer, "_step_fn"):
+        transformer._step_fn = None
+    geometry = getattr(transformer, "_geometry_cache", None)
+    if isinstance(geometry, dict):
+        geometry.clear()
+    try:
+        import mlx.core as mx
+    except ImportError:  # CI and non-Mac hosts: fake models, no mlx
+        return
+    mx.clear_cache()
 
 
 class _ProgressBridge:
@@ -234,6 +258,7 @@ class MlxBackend:
             raise EngineError(f"mlx generation failed: {error}") from error
         finally:
             self._progress.on_progress = None
+            _release_job_memory(model)
         total = time.perf_counter() - started
         buffer = io.BytesIO()
         generated.image.save(buffer, format="PNG")

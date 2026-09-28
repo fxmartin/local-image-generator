@@ -214,6 +214,7 @@ def create_app(
                             _sse("error", {"message": str(exc) or "internal error", "log_tail": []})
                         )
                 finally:
+                    job_finished()
                     events.put(None)
 
         async def relay() -> AsyncIterator[str]:
