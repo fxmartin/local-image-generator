@@ -72,8 +72,16 @@ stopped; it was not, because nix-install manages it now.
 `MFLUX_CACHE_DIR` does not govern Hugging Face hub downloads in mflux 0.20. As a result,
 `lig doctor` reports `mlx 0 file(s)` (#79).
 
-**Default engine:** not changed yet. Under this story's rule the default stays `sdcpp`,
-because MLX missed 120 s. MLX is still 2.4× faster, so the choice is FX's.
+**Default engine: `mlx`** (FX's decision, 2026-09-28). MLX misses the story's 120 s rule,
+which alone would keep `sdcpp`, but it is 2.4× faster. On Apple Silicon, `auto` now resolves
+to `mlx` whenever the `mlx` extra is installed, and to `sdcpp` otherwise. bf16 was not tried
+(FX's decision): it would need the Gemma server stopped to fit about 46 GB. For the XPS the
+change takes effect once the Mac's `lig serve` agent runs a `lig` release with the extra
+(nix-install).
+
+**Caveat:** mflux's edit is img2img: a re-render from the reference at a strength of 0.6 by
+default. It is not the instruction editing sd.cpp does through the vision tower. With MLX
+serving, `lig edit` from the XPS changes behaviour accordingly.
 
 ## Remote overhead (Story 06.3-002)
 

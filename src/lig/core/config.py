@@ -242,7 +242,8 @@ CONFIG_TEMPLATE = """\
 # lig configuration. Precedence: command-line flag > LIG_* env var > this file > defaults.
 # Nested keys map to env vars with a double underscore, e.g. LIG_SERVE__BIND.
 
-# Inference engine: auto, sdcpp, ncnn, mlx or remote.
+# Inference engine: auto, sdcpp, ncnn, mlx or remote. `auto` is the remote host when
+# default_host is set, else mlx on Apple Silicon with the mlx extra installed, else sdcpp.
 # engine = "auto"
 
 # Where generated images are written.

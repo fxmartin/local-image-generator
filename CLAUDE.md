@@ -121,7 +121,7 @@ only so the push mirror has somewhere to land.
 | Host | Engine (planned default) | Notes |
 |---|---|---|
 | `omarchy-xps13` (Arc 140V iGPU, 30 GB) | Remote on the M3 Max by default; local fallback sd.cpp Vulkan at 768², 30 steps (398 s). ncnn, SYCL, torch XPU rejected in Phase 0 | Vulkan works (sd.cpp, the only working engine). oneAPI + Level Zero installed, but SYCL is rejected: the driver under-reports free memory. |
-| `macbook-pro-m3-max` | sd.cpp Metal (Phase 2) → mflux MLX `-q 8` (Phase 3) | Serves the XPS via `lig serve` over the tailnet. |
+| `macbook-pro-m3-max` | mflux MLX q8 (`auto` on Apple Silicon with the `mlx` extra): 255 s at 1024², 40 steps; sd.cpp Metal (615 s) as fallback | Serves the XPS via `lig serve` over the tailnet (launchd agent from nix-install). MLX edit is img2img, not sd.cpp's instruction editing. |
 | `home-lab` (M1 Pro) | same as M3 Max | Always-on; secondary remote target. |
 
 Sampling defaults: 40 steps, 1024×1024, PNG, sizes validated to multiples of 32;

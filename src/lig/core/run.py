@@ -1,6 +1,8 @@
 """Generation orchestration shared by `generate`, and later `edit`, `seeds` and the daemon."""
 
 import hashlib
+import importlib.util
+import platform as platform_module
 import re
 import sys
 from collections.abc import Callable
@@ -170,11 +172,30 @@ def negative_prompt_warning(request: GenerateRequest) -> str | None:
     return None
 
 
-def resolve_engine_name(settings: cfg.Settings) -> str:
-    """`auto` is the remote host when `default_host` is set, else local stable-diffusion.cpp."""
+def _module_installed(name: str) -> bool:
+    """True if `name` can be imported, without importing it (mflux pulls in mlx and torch)."""
+    return importlib.util.find_spec(name) is not None
+
+
+def resolve_engine_name(
+    settings: cfg.Settings,
+    *,
+    platform: str = sys.platform,
+    machine: str | None = None,
+    has_module: Callable[[str], bool] | None = None,
+) -> str:
+    """Resolve `auto`: the remote host when `default_host` is set; else MLX on Apple Silicon
+    when the `mlx` extra is installed (2.4x faster than sd.cpp Metal on the M3 Max, Story
+    07.1-003); else local stable-diffusion.cpp."""
     if settings.engine != "auto":
         return settings.engine
-    return "remote" if settings.default_host else "sdcpp"
+    if settings.default_host:
+        return "remote"
+    machine = machine if machine is not None else platform_module.machine()
+    has_module = has_module or _module_installed
+    if platform == "darwin" and machine in ("arm64", "aarch64") and has_module("mflux"):
+        return "mlx"
+    return "sdcpp"
 
 
 def resolve_host(settings: cfg.Settings, host: str | None) -> tuple[str, str]:
