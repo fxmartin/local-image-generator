@@ -245,8 +245,7 @@ the settings and one line per shot with its final prompt, writes `plan.json` to 
 directory and starts no `lig` process. Edit the file, then render it with
 `lig-series --from-plan plan.json` (no `gemma` call; prompts are re-composed from the settings and
 scenes). After an interruption, `lig-series --from-plan plan.json --out SERIES_DIR --resume`
-renders only the shots without an image, reusing the series' seed. Without a plan, use
-`lig-series --resume --out SERIES_DIR`: planned shots keep their scenes, `gemma` plans the rest.
+renders only the shots without an image, reusing the series' seed (no plan: `--resume --out DIR`).
 
 ```sh
 lig-series "Create 10 photos black and white of a woman in Paris" --plan-only
