@@ -17,6 +17,7 @@
 #### Stories
 
 ##### Story 07.1-001: mflux `QwenImage21` in-process adapter
+**Status**: Done
 **User Story**: As FX, I want an `mlx` backend that loads mflux's `QwenImage21` with `-q 8` quantization by default (bf16 optional) and runs `generate` in-process with per-step progress, so that the Macs use the fastest available engine.
 **Priority**: Should Have
 **Story Points**: 5
@@ -39,6 +40,7 @@
 **Risk Level**: Medium
 
 ##### Story 07.1-002: MLX edit support
+**Status**: Done
 **User Story**: As FX, I want `lig edit --engine mlx` mapped to mflux's image-to-image path (`image_path`, `image_strength`) so that editing works on the Macs too.
 **Priority**: Should Have
 **Story Points**: 3

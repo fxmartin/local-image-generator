@@ -3,6 +3,34 @@
 Sections are generated per release from conventional commits
 (`python scripts/changelog.py X.Y.Z --since vPREV --write`).
 
+## [0.3.0] - 2026-09-28
+
+### Features
+
+- **mlx-apple-silicon:** default to mlx on apple silicon (#07.1-003)
+- **mlx-apple-silicon:** mlx edit support (#07.1-002)
+- **mlx-apple-silicon:** mflux `qwenimage21` in-process (#07.1-001)
+- **photo-series:** review the plan before rendering (#09.2-003)
+- **photo-series:** reusable characters across series (#09.3-003)
+- **photo-series:** `lig-series` entry point and docs (#09.4-001)
+- **photo-series:** series contact sheet (#09.2-004)
+- **photo-series:** series manifest (#09.2-002)
+- **photo-series:** series runner calling `lig generate` (#09.2-001)
+- **photo-series:** deterministic prompt composition (#09.1-003)
+- **photo-series:** per-shot scene (one `gemma` call per (#09.1-004)
+- **photo-series:** global series settings (first `gemma` (#09.1-002)
+- **photo-series:** gemma client (#09.1-001)
+
+### Bug fixes
+
+- **mlx-apple-silicon:** mlx edit support (#07.1-002)
+- **mlx-apple-silicon:** mflux `qwenimage21` in-process (#07.1-001)
+- **mlx-apple-silicon:** `lig models pull --for engine` (#07.2-002)
+- **mlx-apple-silicon:** `--transparent` rgba output (#07.2-001)
+- **photo-series:** label sheet tiles with each shot's title
+- **photo-series:** reusable characters across series (#09.3-003)
+- **photo-series:** pass sheet parameter to _render_plan
+
 ## [0.2.0] - 2026-09-26
 
 ### Features
