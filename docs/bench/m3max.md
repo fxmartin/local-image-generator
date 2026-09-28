@@ -41,6 +41,40 @@ Metal is slow for this model, as expected: 14.8 s/step at 1024² is only about 2
 Vulkan iGPU (28.6 s/step) and roughly 10× the ~1.5 s/step published for MLX on Apple
 Silicon. Speed on the Mac is Epic-07's job.
 
+## MLX (Story 07.1-003)
+
+Measured 2026-09-28 on the M3 Max (48 GB, macOS 26.6.2). The run used `lig` at `main`
+`3d32473`, which includes the mflux adapter, in a throwaway environment:
+`uvx --from "local-image-generator[mlx] @ git+http://gitlab.test/root/local-image-generator.git@3d32473"`.
+The launchd-managed `lig serve` and its `lig 0.2.0` install were left untouched. mflux 0.20.0,
+mlx 0.32.2, quantization `8` (the adapter default).
+
+| Engine | Setting | Load s | s/step | Total s | Peak RSS | vs sd.cpp Metal |
+|---|---|---|---|---|---|---|
+| sd.cpp Metal (06.1-001) | 1024², 40 steps | 21.7 | 14.84 | 615.2 | 10.1 GB | — |
+| **mlx, q8** | 1024², 40 steps | 2.5 | **6.32** | **255.4** | 19.5 GB | **2.4× faster** |
+
+Both rows use the same `lig bench` prompt and seed 42. A separate `lig generate` of the
+cat-and-sign prompt at 1024², 40 steps, seed 42 took 263.9 s (6.41 s/step). The image was
+sharp and photographic; the sign read "qwe" plus a last letter half hidden by the cat's paw.
+
+**Target:** NFR-PERF-002 and this story ask for ≤ 120 s. MLX q8 misses it by about 2×.
+mflux's published figure of about 1.5 s/step at 1024² is for **bf16 on an M5 Max**. bf16 on
+this machine has not been measured: mflux documents about 46 GB peak for bf16, and the Gemma
+`llama-server` was resident during these runs.
+
+**Conditions:** `lig serve` (sd.cpp) and the Gemma `llama-server` were resident but idle
+during the runs; memory stayed at 73 % free or more. The story asks for the daemon to be
+stopped; it was not, because nix-install manages it now.
+
+**First run:** mflux fetched `Qwen/Qwen-Image-2.1` (about 32 GB) on first use, which took
+32 min. The weights went to `~/.cache/huggingface`, not to `lig`'s cache: the adapter's
+`MFLUX_CACHE_DIR` does not govern Hugging Face hub downloads in mflux 0.20. As a result,
+`lig doctor` reports `mlx 0 file(s)` (#79).
+
+**Default engine:** not changed yet. Under this story's rule the default stays `sdcpp`,
+because MLX missed 120 s. MLX is still 2.4× faster, so the choice is FX's.
+
 ## Remote overhead (Story 06.3-002)
 
 Overhead = the XPS's wall clock for one remote run (`lig bench --host m3max`, includes the
