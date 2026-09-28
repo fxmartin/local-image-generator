@@ -3,6 +3,16 @@
 Sections are generated per release from conventional commits
 (`python scripts/changelog.py X.Y.Z --since vPREV --write`).
 
+## [0.4.0] - 2026-09-28
+
+### Features
+
+- **photo-series:** resume a series run without --plan-only
+
+### Bug fixes
+
+- **mlx:** release per-job memory so lig serve stops growing
+
 ## [0.3.1] - 2026-09-28
 
 ### Bug fixes
