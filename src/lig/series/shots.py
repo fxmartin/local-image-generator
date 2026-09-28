@@ -1,7 +1,7 @@
 """Story 09.1-004: one `gemma` call per photo writes that shot's title and scene."""
 
 import time
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 
 from pydantic import BaseModel, ValidationError, field_validator
 
@@ -95,14 +95,19 @@ def plan_shots(
     client: TextGenerator,
     settings: SeriesSettings,
     *,
+    known: Sequence[Shot] = (),
     temperature: float = prompts.SHOT_TEMPERATURE,
 ) -> Iterator[Shot]:
     """Yield shots 1..N lazily, so the caller can render each before the next call.
 
+    `known` are shots 1..k already planned (a resumed series): yielded as they are, no call.
     A failing shot raises `SeriesError` after the earlier shots were already yielded.
     """
     planned: list[Shot] = []
     for index in range(1, settings.count + 1):
-        shot = plan_shot(client, settings, index, planned, temperature=temperature)
+        if index <= len(known):
+            shot = known[index - 1]
+        else:
+            shot = plan_shot(client, settings, index, planned, temperature=temperature)
         planned.append(shot)
         yield shot
