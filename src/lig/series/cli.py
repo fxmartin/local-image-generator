@@ -7,6 +7,7 @@ from functools import partial
 from pathlib import Path
 
 import typer
+from pydantic import ValidationError
 from typer.core import TyperGroup
 
 from lig.core.output import slugify
@@ -22,7 +23,7 @@ from lig.series.settings import (
     SeriesError,
     plan_settings,
 )
-from lig.series.shots import plan_shots
+from lig.series.shots import Shot, plan_shots
 
 MAX_SEED = 2**32
 
@@ -45,8 +46,8 @@ characters_app = typer.Typer(help="List, show or delete saved characters.")
 app.add_typer(characters_app, name="characters")
 
 
-def _plan(client: GemmaClient, settings):
-    for shot in plan_shots(client, settings):
+def _plan(client: GemmaClient, settings, known: list[Shot] | None = None):
+    for shot in plan_shots(client, settings, known=known or []):
         yield compose.with_prompt(shot, settings)
 
 
@@ -124,6 +125,48 @@ def _render_plan(
     raise typer.Exit(result.exit_code)
 
 
+def _resume_live(
+    series_dir: Path,
+    client: GemmaClient,
+    seed: int | None,
+    flags: LigFlags,
+    keep_going: bool,
+    sheet: bool,
+) -> None:
+    """Finish a series run without --plan-only: gemma plans only the shots never planned."""
+    try:
+        manifest = read_manifest(series_dir)
+    except (OSError, ValueError) as error:
+        _usage(f"cannot resume, no readable series.json in {series_dir}: {error}")
+    # Shots are planned in order, so the planned ones are a prefix; a failed shot keeps its
+    # scene and is re-rendered as planned.
+    known: list[Shot] = []
+    for record in sorted(manifest.shots, key=lambda r: r.index):
+        try:
+            known.append(Shot(title=record.title, scene=record.scene))
+        except ValidationError:
+            break
+    done = {
+        r.index: r for r in manifest.shots if r.status == "done" and r.png and Path(r.png).exists()
+    }
+    seed = manifest.seed if seed is None else seed
+    count = manifest.plan.count
+    typer.echo(f"resuming series of {count} in {series_dir} (seed {seed})", err=True)
+    result = run_series(
+        manifest.plan,
+        partial(_plan, client, known=known),
+        out_dir=series_dir,
+        seed=seed,
+        flags=flags,
+        keep_going=keep_going,
+        request=manifest.request,
+        gemma_model=manifest.gemma_model,
+        sheet=sheet,
+        done=done,
+    )
+    raise typer.Exit(result.exit_code)
+
+
 @app.command("run", epilog="Manage saved characters with `lig-series characters --help`.")
 def main(
     request: str | None = typer.Argument(
@@ -155,7 +198,10 @@ def main(
         None, "--from-plan", help="Render an edited plan.json; gemma is not called."
     ),
     resume: bool = typer.Option(
-        False, "--resume", help="With --from-plan and --out: render only shots without an image."
+        False,
+        "--resume",
+        help="With --out: finish an interrupted series, rendering only shots without an image "
+        "(add --from-plan to render a saved plan).",
     ),
     gemma: str | None = typer.Option(None, "--gemma", help="The gemma command to call."),
     plan_timeout: float = typer.Option(600.0, "--plan-timeout", help="Seconds per gemma call."),
@@ -167,7 +213,10 @@ def main(
         if resume and out is None:
             _usage("--resume needs --out, the interrupted series directory")
     elif resume:
-        _usage("--resume needs --from-plan")
+        if request is not None or out is None:
+            _usage("--resume needs --out, the interrupted series directory, and no request")
+        client = GemmaClient(binary=gemma, timeout=plan_timeout)
+        _resume_live(out, client, seed, _flags(locals()), keep_going, not no_sheet)
     elif request is None:
         _usage("a request is required unless --from-plan is given")
     if from_plan is not None:

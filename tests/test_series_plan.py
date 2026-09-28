@@ -1,6 +1,7 @@
 """Story 09.2-003: `--plan-only`, `--from-plan` and `--resume`, offline with the stub gemma."""
 
 import json
+from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
@@ -120,3 +121,64 @@ def test_format_and_count_mismatch():
 def test_read_plan_error_is_series_error(tmp_path):
     with pytest.raises(SeriesError):
         read_plan(tmp_path / "missing.json")
+
+
+def _logging_gemma(tmp_path, gemma):
+    """Wrap the stub gemma so every call appends `global` or `shot` to a log file."""
+    log = tmp_path / "gemma-calls.log"
+    script = tmp_path / "gemma-logged"
+    script.write_text(
+        "#!/bin/sh\n"
+        f'case "$*" in *"plan a series"*) kind=global ;; *) kind=shot ;; esac\n'
+        f'echo "$kind" >> "{log}"\n'
+        f'exec "{gemma}" "$@"\n'
+    )
+    script.chmod(0o755)
+    return script, log
+
+
+def _interrupt_live_series(tmp_path, monkeypatch):
+    """A live 3-shot series stopped on shot 2 like a dropped server: 2 failed, 3 skipped."""
+    gemma = _stub_replies(monkeypatch, tmp_path)
+    series = tmp_path / "live"
+    assert _invoke(gemma, series, "--seed", "4", "--no-sheet").exit_code == 0
+    manifest = json.loads((series / "series.json").read_text())
+    first, second, third = manifest["shots"]
+    for record in (second, third):
+        Path(record["png"]).unlink()
+    second.update(status="failed", png=None, sidecar=None, exit_code=1,
+                  scene="kept " + " ".join(["scene"] * 24))  # fmt: skip
+    manifest["shots"][2] = {"index": 3, "status": "skipped"}
+    (series / "series.json").write_text(json.dumps(manifest))
+    return gemma, series, first
+
+
+def test_resume_live_series_replans_only_unplanned_shots(tmp_path, monkeypatch):
+    gemma, series, first = _interrupt_live_series(tmp_path, monkeypatch)
+    first_png = Path(first["png"])
+    stamp = first_png.stat().st_mtime_ns
+    logged, log = _logging_gemma(tmp_path, gemma)
+    result = runner.invoke(
+        app,
+        ["--resume", "--out", str(series), "--gemma", str(logged), "--engine", "fake",
+         "--size", "256x256", "--steps", "1"],
+    )  # fmt: skip
+    assert result.exit_code == 0, result.output
+    assert log.read_text().split() == ["shot"]  # no global call; shot 2 keeps its scene
+    assert first_png.stat().st_mtime_ns == stamp
+    manifest = json.loads((series / "series.json").read_text())
+    assert manifest["seed"] == 4
+    records = manifest["shots"]
+    assert [r["status"] for r in records] == ["done"] * 3
+    assert "kept" in records[1]["prompt"] and records[2]["title"] == "Lamp"
+    assert all(Path(r["png"]).exists() for r in records)
+
+
+def test_resume_live_series_without_series_json_exits_2(tmp_path):
+    result = runner.invoke(app, ["--resume", "--out", str(tmp_path / "none")])
+    assert result.exit_code == 2 and "series.json" in result.output
+
+
+def test_resume_live_series_rejects_a_request(tmp_path):
+    result = runner.invoke(app, ["req", "--resume", "--out", str(tmp_path)])
+    assert result.exit_code == 2
