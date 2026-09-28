@@ -3,6 +3,12 @@
 Sections are generated per release from conventional commits
 (`python scripts/changelog.py X.Y.Z --since vPREV --write`).
 
+## [0.3.1] - 2026-09-28
+
+### Bug fixes
+
+- **mlx:** pin model calls to one thread for lig serve
+
 ## [0.3.0] - 2026-09-28
 
 ### Features
