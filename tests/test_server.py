@@ -460,6 +460,14 @@ def test_ttl_zero_unloads_after_every_job(tmp_path):
     assert backend.unloads == 1
 
 
+def test_streamed_job_arms_the_idle_unload(tmp_path):
+    # `lig generate --host` always streams; its jobs must unload after the TTL too.
+    backend, client = _warm_client(tmp_path, ttl=0.05)
+    assert client.post("/v1/generate?stream=1", json=GEN).status_code == 200
+    assert _wait_for(lambda: backend.unloads == 1)
+    assert client.get("/v1/health").json()["loaded"] is False
+
+
 def test_job_arriving_before_ttl_defers_unload(tmp_path):
     backend, client = _warm_client(tmp_path, ttl=600)
     client.post("/v1/generate", json=GEN)
