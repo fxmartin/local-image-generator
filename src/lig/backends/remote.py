@@ -142,6 +142,7 @@ class RemoteBackend:
                         raise self._http_error(response)
                     if response.headers.get("content-type", "").startswith("text/event-stream"):
                         return self._result_from_stream(response, request, on_progress)
+                    response.read()  # a streamed response has no body until it is read
                     return self._result(response.json(), request)
             except _UNREACHABLE as exc:
                 if attempt == 2:
