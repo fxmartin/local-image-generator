@@ -436,7 +436,7 @@ dev = [
 requires-dist = [
     { name = "fastapi", marker = "extra == 'serve'", specifier = ">=0.110" },
     { name = "httpx", specifier = ">=0.27" },
-    { name = "mflux", marker = "platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'mlx'", specifier = ">=0.4" },
+    { name = "mflux", marker = "platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'mlx'", specifier = "==0.20.0" },
     { name = "pillow", specifier = ">=10" },
     { name = "platformdirs", specifier = ">=4" },
     { name = "pydantic", specifier = ">=2" },

@@ -96,3 +96,14 @@ def test_list_reports_error_when_cache_dir_unusable(models_dir, monkeypatch):
     result = runner.invoke(app, ["models", "list"])
     assert result.exit_code == 1
     assert "read-only file system" in result.output
+
+
+def test_build_report_tolerates_a_missing_models_dir(tmp_path):
+    # `lig serve` reports on models_dir without creating it; macOS purged ~/Library/Caches/lig
+    # on the M3 Max and /v1/health crashed with FileNotFoundError (2026-10-10).
+    missing = tmp_path / "purged" / "models"
+    report = cache.build_report(load_registry(), missing)
+    assert report["cache_bytes"] == 0
+    assert report["free_bytes"] > 0
+    assert {a["status"] for a in report["artifacts"]} == {"missing"}
+    assert not missing.exists()

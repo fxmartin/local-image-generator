@@ -55,3 +55,10 @@ def test_extras_are_optional():
     assert {"serve", "mlx"} <= extras.keys()
     base = " ".join(PYPROJECT["project"]["dependencies"])
     assert "fastapi" not in base and "mflux" not in base
+
+
+def test_mlx_extra_pins_the_mflux_version_the_adapter_was_verified_against():
+    # The adapter clears private mflux internals (`_step_fn`, `_geometry_cache`); 0.22.0 adds
+    # an `_image_step_fn` it does not know about, so a loose `mflux>=` pin is unsafe.
+    (spec,) = PYPROJECT["project"]["optional-dependencies"]["mlx"]
+    assert spec.startswith("mflux==0.20.0;")

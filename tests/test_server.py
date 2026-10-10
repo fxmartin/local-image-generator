@@ -522,3 +522,10 @@ def test_cli_serve_passes_idle_ttl(isolated, monkeypatch):
 def test_cli_serve_rejects_negative_ttl(isolated):
     result = runner.invoke(app, ["serve", "--engine", "fake", "--idle-ttl", "-1"])
     assert result.exit_code == 2
+
+
+def test_health_survives_a_missing_models_dir(tmp_path):
+    api = TestClient(create_app(FakeBackend(), load_registry(), tmp_path / "purged" / "models"))
+    response = api.get("/v1/health")
+    assert response.status_code == 200
+    assert response.json()["weights"]["installed"] == 0
