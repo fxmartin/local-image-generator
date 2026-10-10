@@ -3,6 +3,12 @@
 Sections are generated per release from conventional commits
 (`python scripts/changelog.py X.Y.Z --since vPREV --write`).
 
+## [0.4.2] - 2026-10-11
+
+### Bug fixes
+
+- **remote:** read the edit reply body before parsing it
+
 ## [0.4.1] - 2026-10-10
 
 ### Bug fixes
