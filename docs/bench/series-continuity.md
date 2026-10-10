@@ -61,3 +61,56 @@ shots despite the change from black and white to colour.
   chose, `Elodie`, so one character has two names. Open.
 - The render records above were produced by the sdlc build agent; the verdict was added by FX.
   The agent's draft stated the verdict on FX's behalf (claude-code-config#728).
+
+# Continuity spike: shared prompt vs anchor image
+
+Story 09.3-001, hand-run. **Default for 09.3-002: `prompt`.** Both anchor modes
+are rejected: they reproduce the reference image instead of building the new scene.
+
+Run on 2026-10-11 from `omarchy-xps13` against the M3 Max: `lig` 0.4.1 at `main`
+`6f2d98b` plus the remote-edit fix (!76; without it every remote `lig edit`
+failed), MLX engine (mflux 0.20.0), 1024², 40 steps, seed `1069047787` for every
+render. One `gemma` plan, `--plan-only`, rendered three ways:
+
+- request "3 photos black and white of a woman in Paris";
+- shots: a wide shot walking down a Montmartre street, a waist-up medium shot by
+  a stone wall, an extreme close-up of the face.
+
+| Mode | How | Wall time | Contact sheet |
+|---|---|---|---|
+| (a) prompt | `lig generate "<look> <scene> Style: <style>"` per shot | **19 min 33 s** | [spike-prompt.png](series-continuity/spike-prompt.png) |
+| (b) anchor-edit | shot 1 generated, shots 2–3 `lig edit SHOT1.png "<look> <scene> Style: …"` | **10 min 42 s** | [spike-anchor-edit.png](series-continuity/spike-anchor-edit.png) |
+| (c) anchor-portrait | neutral full-body portrait generated, every shot `lig edit PORTRAIT "Place this person in: <scene> Style: …"` | **13 min 54 s** | [spike-anchor-portrait.png](series-continuity/spike-anchor-portrait.png) |
+
+A generate takes 350–395 s (about 9.6 s/step). An edit takes 145–170 s: MLX edit is
+img2img at the default strength 0.6, so it runs 16 of the 40 steps from the
+reference. The anchor modes are faster only because of that, which is also why they fail.
+
+## Verdict
+
+FX's verdict on the three sheets, 2026-10-11:
+
+- **(a) prompt: same person, yes; the scene changes, yes.** The framing goes from wide to
+  waist-up to close-up and the background changes with it. The beret, coat and silver
+  pendant hold in every shot; the close-up face reads slightly older.
+- **(b) anchor-edit: rejected.** Shots 2 and 3 are near-copies of shot 1: the same
+  street, pose and wide framing. The waist-up shot by a wall and the close-up never
+  appear. See [spike-anchor-edit.png](series-continuity/spike-anchor-edit.png).
+- **(c) anchor-portrait: rejected.** All three shots are the reference portrait
+  again, on the same grey studio background. No Montmartre scene is built. See
+  [spike-anchor-portrait.png](series-continuity/spike-anchor-portrait.png).
+
+The story's risk was that instruction editing keeps too much of the reference.
+On MLX, edit is img2img, which keeps even more: at strength 0.6 the composition
+is fixed by the reference. A strength high enough to move the scene (≥ 0.85)
+leaves little of the reference, so it would give up the identity that anchor
+mode exists for. sd.cpp's instruction editing (Metal, about 615 s per shot) was not
+tried. Per 09.3-002's technical notes, that story shrinks to documenting prompt
+mode as the only mode, and 09.3-003 keeps the look text only.
+
+## Defects found in this run
+
+- **!76**: `RemoteBackend` parsed a plain-JSON reply from a streamed POST without
+  reading the body, so every `lig edit --host` failed with `ResponseNotRead`
+  after the server had rendered the image. Generate was unaffected because it uses SSE.
+  The tests' fake daemon returned a pre-read body. Fixed.
