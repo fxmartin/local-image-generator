@@ -36,6 +36,16 @@ def write_config(tmp_path, text):
     path.write_text(text)
 
 
+class _Unread(httpx.SyncByteStream):
+    """A body httpx must read off the wire, as from a real `lig serve`."""
+
+    def __init__(self, data: bytes):
+        self._data = data
+
+    def __iter__(self):
+        yield self._data
+
+
 class Server:
     """A fake daemon: the real ASGI app would need sockets, so replay its wire format."""
 
@@ -83,12 +93,12 @@ class Server:
         assert b'name="prompt"' in request.content
         req = GenerateRequest(prompt="x", width=256, height=256, steps=2, seed=1)
         result = self.backend.generate(req, None)
+        body = json.dumps(
+            {"metadata": self._meta(result), "png_base64": base64.b64encode(result.png).decode()}
+        )
+        # Over a real socket the body arrives unread; a `json=` reply would come pre-read.
         return httpx.Response(
-            200,
-            json={
-                "metadata": self._meta(result),
-                "png_base64": base64.b64encode(result.png).decode(),
-            },
+            200, headers={"content-type": "application/json"}, stream=_Unread(body.encode())
         )
 
 
