@@ -250,6 +250,8 @@
 **Dependencies**: 09.2-001
 **Risk Level**: High
 
+**Result** (2026-10-11): done. Default is `prompt`; both anchor modes rejected, since they reproduce the reference instead of the new scene. See `docs/bench/series-continuity.md`.
+
 ##### Story 09.3-002: Anchor continuity mode
 **User Story**: As FX, I want `--continuity prompt|anchor` with the spike's winner as the default, so that characters stay recognisable even when the scenes differ a lot.
 **Priority**: Should Have
@@ -351,5 +353,5 @@
 MVP (9 stories): 09.1-001, 09.1-002, 09.1-003, 09.1-004, 09.2-001, 09.2-002, 09.2-003, 09.3-003, 09.4-001.
 
 ## Epic Progress
-- [ ] 09.1-001 (3) · [ ] 09.1-002 (5) · [ ] 09.1-003 (2) · [ ] 09.1-004 (3) · [ ] 09.2-001 (5) · [ ] 09.2-002 (2) · [ ] 09.2-003 (3) · [ ] 09.2-004 (2) · [ ] 09.3-001 (3) · [ ] 09.3-002 (5) · [ ] 09.3-003 (3) · [ ] 09.4-001 (2) · [ ] 09.4-002 (2)
+- [ ] 09.1-001 (3) · [ ] 09.1-002 (5) · [ ] 09.1-003 (2) · [ ] 09.1-004 (3) · [ ] 09.2-001 (5) · [ ] 09.2-002 (2) · [ ] 09.2-003 (3) · [ ] 09.2-004 (2) · [x] 09.3-001 (3) · [ ] 09.3-002 (5) · [ ] 09.3-003 (3) · [ ] 09.4-001 (2) · [ ] 09.4-002 (2)
 - **Completed**: 0 / 40 points
