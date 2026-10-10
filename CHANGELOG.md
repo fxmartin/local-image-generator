@@ -3,6 +3,12 @@
 Sections are generated per release from conventional commits
 (`python scripts/changelog.py X.Y.Z --since vPREV --write`).
 
+## [0.4.1] - 2026-10-10
+
+### Bug fixes
+
+- **mlx:** pin mflux 0.20.0 and survive a missing models dir
+
 ## [0.4.0] - 2026-09-28
 
 ### Features
