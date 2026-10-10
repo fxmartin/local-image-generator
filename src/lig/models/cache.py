@@ -39,6 +39,13 @@ def _dir_bytes(path: Path) -> int:
     return sum(f.stat().st_size for f in path.rglob("*") if f.is_file())
 
 
+def _free_bytes(path: Path) -> int:
+    """Free space where `path` lives or will live; a report must not create the directory."""
+    while not path.exists() and path != path.parent:
+        path = path.parent
+    return shutil.disk_usage(path).free
+
+
 def build_report(registry: Registry, models_dir: Path, engine: str | None = None) -> dict[str, Any]:
     artifacts = [a for a in registry.artifacts if engine is None or engine in a.engines]
     return {
@@ -55,7 +62,7 @@ def build_report(registry: Registry, models_dir: Path, engine: str | None = None
             for a in artifacts
         ],
         "cache_bytes": _dir_bytes(models_dir),
-        "free_bytes": shutil.disk_usage(models_dir).free,
+        "free_bytes": _free_bytes(models_dir),
     }
 
 
