@@ -120,11 +120,12 @@ are under the Qwen Research License (research/evaluation use only).
 
 ## 4. The five commands
 
-Every command that renders writes a PNG plus a JSON sidecar (seed, prompt, engine, timings)
-to `./outputs` (or `--out DIR`) and prints the PNG path as its last line.
-Exit codes shared by the rendering commands: **0** ok, **1** engine error, **2** usage error
-(bad size, unknown engine, invalid config), **3** memory pre-flight refusal (`--force`
-overrides), **4** engine unavailable (missing binary or weights; the message says which).
+Every command that renders writes a PNG plus a JSON sidecar (seed, prompt, engine, timings) to `./outputs` (or `--out
+DIR`) and prints the PNG path as its last line. `--json` prints one JSON document instead (sidecar plus `path`;
+`seeds`: all images and the sheet; `bench`: the report), `--open` shows the result in the image viewer, and `lig
+--install-completion` completes engine, host and weight names. Exit codes shared by the rendering commands: **0** ok,
+**1** engine error, **2** usage error (bad size, unknown engine, invalid config), **3** memory pre-flight refusal
+(`--force` overrides), **4** engine unavailable (missing binary or weights; the message says which).
 
 ### `lig generate`
 
@@ -150,9 +151,8 @@ Needs the `mmproj` weight (pulled with the sdcpp set); on `mlx` it defaults to
 lig seeds "a lighthouse at dusk" --count 4 --seed-start 100 --size 512x512
 ```
 
-Renders `--count` images (default 4, max 8) with consecutive seeds and a labelled contact
-sheet (`--no-sheet` to skip). Exit codes: 0, 1 (a seed failed; earlier images are kept),
-2 (`--count` outside 1-8), 3, 4.
+Renders `--count` images (default 4, max 8) with consecutive seeds and a labelled contact sheet (`--no-sheet`
+to skip). Exit codes: 0, 1 (a seed failed; earlier images are kept), 2 (`--count` outside 1-8), 3, 4.
 
 ### `lig bench`
 

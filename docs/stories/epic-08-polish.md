@@ -77,6 +77,8 @@
 **Dependencies**: 04.1-001, 04.4-001, 03.2-001
 **Risk Level**: Low
 
+**Result** (2026-10-11): `--json` on `generate`, `edit`, `seeds` and `bench` (with `models list` and `doctor` already having it). The document is the sidecar plus `path`/`sidecar_path`, for `seeds` `{seed_start, images, sheet}`, and for `bench` the report as written. `--open` on `generate`, `edit` and `seeds` (the sheet, or each image with `--no-sheet`). Completion for `--engine`, `--host` (config `[hosts]`) and artifact names via `lig --install-completion`. Not covered: `bench compare`/`render`/`overhead` (tables and Markdown by design), `models pull`/`verify`/`rm`, `config`, `serve`.
+
 ##### Story 08.1-004: Size-variant contact sheet
 **User Story**: As FX, I want `lig sizes PROMPT --seed S --sizes 1024x1024,1536x864,864x1536` to render the same seed at several aspect ratios into one sheet, so that I can pick the framing for a slide or a post header in one pass.
 **Priority**: Could Have
@@ -121,5 +123,5 @@
 | Backlog | 08.1-001, 08.1-002, 08.1-003, 08.1-004, 08.1-005 | 20 | Not planned |
 
 ## Epic Progress
-- [ ] 08.1-001 (5) · [ ] 08.1-002 (5) · [ ] 08.1-003 (3) · [ ] 08.1-004 (2) · [ ] 08.1-005 (5)
-- **Completed**: 0 / 20 points
+- [ ] 08.1-001 (5) · [ ] 08.1-002 (5) · [x] 08.1-003 (3) · [ ] 08.1-004 (2) · [ ] 08.1-005 (5)
+- **Completed**: 3 / 20 points
