@@ -35,13 +35,15 @@ def engine_flag(engine: str | None, host: str | None) -> str | None:
 
 
 def open_backend(
-    ctx: typer.Context, settings: cfg.Settings, host: str | None = None
+    ctx: typer.Context, settings: cfg.Settings, host: str | None = None, wait: bool = False
 ) -> tuple[Backend, str]:
     """Build the configured backend and confirm it can run; exit 2/4 otherwise."""
     engine_name = run.resolve_engine_name(settings)
+    if wait and engine_name != "remote":
+        raise _fail("--wait queues the job on a `lig serve` host; use --host NAME", EXIT_USAGE)
     verbose = bool((ctx.obj or {}).get("verbose"))
     try:
-        backend = run.make_backend(engine_name, settings, verbose=verbose, host=host)
+        backend = run.make_backend(engine_name, settings, verbose=verbose, host=host, wait=wait)
         availability = backend.available()
     except run.UsageError as exc:
         raise _fail(str(exc), EXIT_USAGE) from exc
@@ -127,6 +129,9 @@ def generate(
     host: str | None = typer.Option(
         None, "--host", help=HOST_HELP, autocompletion=scripting.complete_host
     ),
+    wait: bool = typer.Option(
+        False, "--wait", help="Queue the job on the --host daemon and follow it by polling."
+    ),
     out: Path | None = typer.Option(None, "--out", help="Output directory."),  # noqa: B008
     negative: str | None = typer.Option(None, "--negative", help="Negative prompt."),
     guidance: float | None = typer.Option(None, "--guidance", help="Guidance scale."),
@@ -162,7 +167,7 @@ def generate(
     if (warning := run.negative_prompt_warning(request)) is not None:
         typer.echo(f"warning: {warning}", err=True)
 
-    backend, engine_name = open_backend(ctx, settings, host)
+    backend, engine_name = open_backend(ctx, settings, host, wait)
     if transparent and not backend.capabilities().supports_transparent:
         raise _fail(
             f"engine '{engine_name}' cannot render transparent output; "

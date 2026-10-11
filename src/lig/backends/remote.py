@@ -20,6 +20,7 @@ from lig.core.models import EditRequest, GenerateRequest, ImageResult, Timings, 
 CONNECT_TIMEOUT_S = 5.0
 HEALTH_TIMEOUT_S = 10.0
 RETRY_BACKOFF_S = 1.0
+POLL_INTERVAL_S = 0.5
 # Health predates the `capabilities` field on older servers; assume the common case.
 FALLBACK_CAPABILITIES = Capabilities(supports_edit=True, supports_transparent=False, platforms=[])
 _UNREACHABLE = (httpx.ConnectError, httpx.ConnectTimeout)
@@ -70,11 +71,14 @@ class RemoteBackend:
         url: str,
         client: httpx.Client | None = None,
         sleep: Callable[[float], None] = time.sleep,
+        wait: bool = False,
     ) -> None:
         self.host_name = host_name
         self.url = url.rstrip("/")
         self._client = client or make_client()
         self._sleep = sleep
+        # Queue generates on the daemon and poll the job, instead of holding one request open.
+        self._wait = wait
         self._health: dict[str, Any] | None = None
 
     def _get_health(self) -> dict[str, Any]:
@@ -108,6 +112,8 @@ class RemoteBackend:
     def generate(
         self, request: GenerateRequest, on_progress: ProgressCallback | None
     ) -> ImageResult:
+        if self._wait:
+            return self._generate_queued(request, on_progress)
         return self._post(
             "/v1/generate?stream=1", request, on_progress, json=request.model_dump(mode="json")
         )
@@ -151,6 +157,67 @@ class RemoteBackend:
             except httpx.HTTPError as exc:
                 raise EngineError(f"connection to {self.url} failed: {exc}") from exc
         raise AssertionError("unreachable")  # pragma: no cover
+
+    def _generate_queued(
+        self, request: GenerateRequest, on_progress: ProgressCallback | None
+    ) -> ImageResult:
+        """POST `?queue=1`, then poll `/v1/jobs/{id}`; Ctrl-C cancels the job on the daemon."""
+        payload = request.model_dump(mode="json")
+        try:
+            response = self._client.post(self.url + "/v1/generate?queue=1", json=payload)
+        except _UNREACHABLE as exc:
+            raise EngineUnavailable(f"cannot reach {self.url}: {exc}") from exc
+        except httpx.HTTPError as exc:
+            raise EngineError(f"connection to {self.url} failed: {exc}") from exc
+        if response.status_code == 200:  # a daemon without a job queue ran it inline
+            return self._result(response.json(), request)
+        if response.status_code != 202:
+            raise self._http_error(response)
+        job_id = response.json()["id"]
+        try:
+            return self._follow_job(job_id, request, on_progress)
+        except BaseException:
+            self._cancel_job(job_id)
+            raise
+
+    def _follow_job(
+        self, job_id: str, request: GenerateRequest, on_progress: ProgressCallback | None
+    ) -> ImageResult:
+        target = f"{self.url}/v1/jobs/{job_id}"
+        last_step = 0
+        while True:
+            try:
+                response = self._client.get(target)
+            except httpx.HTTPError as exc:
+                raise EngineError(f"connection to {self.url} failed: {exc}") from exc
+            if response.status_code == 404:
+                raise EngineError(f"{self.url} no longer knows job {job_id} (daemon restarted?)")
+            if response.status_code != 200:
+                raise self._http_error(response)
+            job = response.json()
+            progress = job.get("progress")
+            if progress and on_progress and progress["step"] > last_step:
+                last_step = progress["step"]
+                on_progress(progress["step"], progress["total"])
+            state = job["state"]
+            if state == "done":
+                return self._result(job["result"], request)
+            if state == "failed":
+                error = job.get("error") or {}
+                raise EngineError(
+                    f"{self.url}: {error.get('message', 'job failed')}",
+                    "\n".join(error.get("log_tail") or []),
+                )
+            if state == "cancelled":
+                raise EngineError(f"{self.url}: job {job_id} was cancelled")
+            self._sleep(POLL_INTERVAL_S)
+
+    def _cancel_job(self, job_id: str) -> None:
+        """Best effort: the job is abandoned either way, so a failure here is only logged."""
+        try:
+            self._client.delete(f"{self.url}/v1/jobs/{job_id}", timeout=CONNECT_TIMEOUT_S)
+        except httpx.HTTPError:
+            pass
 
     def _http_error(self, response: httpx.Response) -> EngineError:
         try:

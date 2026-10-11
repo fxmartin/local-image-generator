@@ -10,23 +10,24 @@ import queue
 import tempfile
 import threading
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, ValidationError
 
 from lig import __version__
-from lig.backends.base import Backend, EngineError
+from lig.backends.base import Backend, EngineError, ProgressCallback
 from lig.core.bench import build_backend
 from lig.core.logs import TAIL_LINES, tail_lines
 from lig.core.models import EditRequest, GenerateRequest, ImageResult
 from lig.core.output import SidecarSchema, sidecar_for
 from lig.models import cache
 from lig.models.registry import Registry
+from lig.server.jobs import Cancelled, JobAlreadyFinished, JobQueue
 
 log = logging.getLogger(__name__)
 
@@ -100,7 +101,7 @@ def create_app(
     api = FastAPI(title="lig serve", version=__version__)
     started = time.monotonic()
     host = platform.node() or "localhost"
-    # One engine process at a time; a queue with states is Epic-08.
+    # One engine process at a time, whether a job comes from a blocking request or the job queue.
     engine_lock = threading.Lock()
     warm = bool(getattr(backend, "supports_warm", False))
     last_job_end = 0.0
@@ -145,6 +146,20 @@ def create_app(
 
     def report() -> dict[str, Any]:
         return cache.build_report(registry, models_dir, backend.name)
+
+    def run_queued(
+        request: GenerateRequest, on_progress: ProgressCallback, cancelled: Callable[[], bool]
+    ) -> dict[str, Any]:
+        with engine_lock:
+            try:
+                if cancelled():  # cancelled while a blocking request held the engine
+                    raise Cancelled
+                body = respond(backend.generate(request, on_progress))
+            finally:
+                job_finished()
+        return {"metadata": body.metadata.model_dump(), "png_base64": body.png_base64}
+
+    jobs = JobQueue(run_queued)
 
     @api.get("/v1/health")
     def health() -> dict[str, Any]:
@@ -240,7 +255,16 @@ def create_app(
         )
 
     @api.post("/v1/generate", response_model=GenerateResponse)
-    def generate(request: GenerateRequest, stream: int = 0) -> Any:
+    def generate(
+        request: GenerateRequest, stream: int = 0, enqueue: Annotated[int, Query(alias="queue")] = 0
+    ) -> Any:
+        if enqueue:
+            job = jobs.submit(request)
+            return JSONResponse(
+                status_code=202,
+                content={k: job[k] for k in ("id", "state", "position")},
+                headers={"Location": f"/v1/jobs/{job['id']}"},
+            )
         if stream:
             return stream_generate(request)
         with engine_lock:
@@ -252,6 +276,23 @@ def create_app(
             finally:
                 job_finished()
         return respond(result)
+
+    @api.get("/v1/jobs/{job_id}")
+    def job_status(job_id: str) -> dict[str, Any]:
+        job = jobs.get(job_id)
+        if job is None:
+            raise HTTPException(404, f"no such job: {job_id}")
+        return job
+
+    @api.delete("/v1/jobs/{job_id}")
+    def job_cancel(job_id: str) -> dict[str, Any]:
+        try:
+            job = jobs.cancel(job_id)
+        except JobAlreadyFinished as exc:
+            raise HTTPException(409, f"job {job_id} already {exc}") from exc
+        if job is None:
+            raise HTTPException(404, f"no such job: {job_id}")
+        return job
 
     @api.post("/v1/edit", response_model=GenerateResponse)
     def edit(
