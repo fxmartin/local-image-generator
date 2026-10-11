@@ -2,6 +2,7 @@
 
 import json
 import math
+from collections.abc import Callable
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -18,8 +19,20 @@ def grid_shape(count: int) -> tuple[int, int]:
     return math.ceil(count / cols), cols
 
 
-def build_sheet(members: list[tuple[Path, int]], out_dir: Path, batch_id: str) -> Path:
-    """Write `<batch_id>_sheet.png` plus a `.json` sidecar listing files and seeds."""
+def seed_label(_path: Path, seed: int) -> str:
+    return f"seed {seed}"
+
+
+def build_sheet(
+    members: list[tuple[Path, int]],
+    out_dir: Path,
+    batch_id: str,
+    label: Callable[[Path, int], str] = seed_label,
+) -> Path:
+    """Write `<batch_id>_sheet.png` plus a `.json` sidecar listing files, seeds and labels.
+
+    `label(path, seed)` names each tile; `lig seeds` labels by seed, `lig sizes` by size.
+    """
     tiles: list[Image.Image] = []
     for path, _ in members:
         with Image.open(path) as img:
@@ -32,19 +45,22 @@ def build_sheet(members: list[tuple[Path, int]], out_dir: Path, batch_id: str) -
     cell_h = max(t.height for t in tiles)
     sheet = Image.new("RGB", (cols * cell_w, rows * cell_h), "black")
     draw = ImageDraw.Draw(sheet)
-    for i, (tile, (_, seed)) in enumerate(zip(tiles, members, strict=True)):
+    labels = [label(path, seed) for path, seed in members]
+    for i, (tile, text) in enumerate(zip(tiles, labels, strict=True)):
         x, y = (i % cols) * cell_w, (i // cols) * cell_h
         sheet.paste(tile, (x, y))
-        label = f"seed {seed}"
-        left, top, right, bottom = draw.textbbox((x + LABEL_PAD, y + LABEL_PAD), label)
+        left, top, right, bottom = draw.textbbox((x + LABEL_PAD, y + LABEL_PAD), text)
         draw.rectangle((left - 2, top - 2, right + 2, bottom + 2), fill="black")
-        draw.text((x + LABEL_PAD, y + LABEL_PAD), label, fill="white")
+        draw.text((x + LABEL_PAD, y + LABEL_PAD), text, fill="white")
 
     png_path = out_dir / f"{batch_id}_sheet.png"
     sheet.save(png_path, "PNG")
     sidecar = {
         "batch_id": batch_id,
-        "members": [{"file": path.name, "seed": seed} for path, seed in members],
+        "members": [
+            {"file": path.name, "seed": seed, "label": text}
+            for (path, seed), text in zip(members, labels, strict=True)
+        ],
     }
     _atomic_write(png_path.with_suffix(".json"), json.dumps(sidecar, indent=2).encode())
     return png_path
