@@ -99,6 +99,7 @@
 **Risk Level**: Low
 
 ##### Story 08.1-005: OpenVINO backend evaluation
+**Status**: Deferred (2026-10-11): Intel's Qwen-Image-2.1 notebook is still marked experimental; check recorded in `docs/bench/xps13.md`. Re-check January 2027.
 **User Story**: As FX, I want a time-boxed evaluation of the Optimum-Intel / OpenVINO Qwen-Image-2.1 pipeline on the XPS, adopted as an `openvino` backend only if it beats the Phase 0 default, so that the Intel-validated path is not ignored once it stabilises.
 **Priority**: Could Have
 **Story Points**: 5
