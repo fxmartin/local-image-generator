@@ -1,5 +1,6 @@
 """`lig generate`: resolve config, pre-flight memory, pick the backend, write PNG + sidecar."""
 
+import sys
 from pathlib import Path
 
 import typer
@@ -8,7 +9,8 @@ from lig.backends.base import Backend, EngineUnavailable
 from lig.cli import scripting
 from lig.cli.progress import generation_progress
 from lig.core import config as cfg
-from lig.core import run
+from lig.core import rewriter, run
+from lig.core.models import GenerateRequest
 from lig.models.registry import RegistryError, load_registry
 
 EXIT_USAGE = 2
@@ -50,9 +52,69 @@ def open_backend(
     return backend, engine_name
 
 
+def stdin_is_interactive() -> bool:
+    return sys.stdin.isatty()
+
+
+def _prompt_source(
+    prompt: str | None, prompt_from: Path | None, rewrite: bool, settings: cfg.RewriterSettings
+) -> rewriter.PromptSource:
+    """The prompt to render, from the argument or a saved sidecar; usage errors raise."""
+    if prompt is not None and prompt_from is not None:
+        raise run.UsageError("give either PROMPT or --prompt-from, not both")
+    if prompt_from is not None:
+        if rewrite:
+            raise run.UsageError(
+                "--rewrite and --prompt-from are exclusive: the saved prompt is reused as is"
+            )
+        try:
+            return rewriter.load_prompt_file(prompt_from)
+        except rewriter.RewriterError as exc:
+            raise run.UsageError(str(exc)) from exc
+    if prompt is None:
+        raise run.UsageError("give a PROMPT or --prompt-from FILE.json")
+    if rewrite and not (settings.endpoint and settings.model):
+        raise run.UsageError(
+            "--rewrite needs rewriter.endpoint and rewriter.model in config "
+            "(env: LIG_REWRITER__ENDPOINT, LIG_REWRITER__MODEL)"
+        )
+    return rewriter.PromptSource(prompt, None)
+
+
+def _rewrite_request(
+    request: GenerateRequest, settings: cfg.RewriterSettings, quiet: bool
+) -> tuple[GenerateRequest, str | None]:
+    """Expand the prompt; returns the request to render and the original prompt if it changed.
+
+    An unusable rewriter is not fatal: ask whether to go on with the original prompt, or just
+    warn and go on when nobody can answer."""
+    try:
+        expanded = rewriter.rewrite_prompt(
+            request.prompt, settings.endpoint or "", settings.model or ""
+        )
+    except rewriter.RewriterError as exc:
+        typer.echo(f"warning: {exc}", err=True)
+        if not stdin_is_interactive():
+            typer.echo("warning: continuing with the original prompt", err=True)
+        elif not typer.confirm("Continue with the original prompt?", err=True):
+            raise typer.Exit(1) from exc
+        return request, None
+    if not quiet:
+        typer.echo(f"rewritten prompt: {expanded}", err=True)
+    return request.model_copy(update={"prompt": expanded}), request.prompt
+
+
 def generate(
     ctx: typer.Context,
-    prompt: str = typer.Argument(..., help="What to draw."),
+    prompt: str | None = typer.Argument(None, help="What to draw."),
+    rewrite: bool = typer.Option(
+        False, "--rewrite", help="Expand the prompt through the [rewriter] LLM endpoint first."
+    ),
+    prompt_from: Path | None = typer.Option(  # noqa: B008
+        None,
+        "--prompt-from",
+        help="Reuse the prompt of a saved sidecar .json (its expansion, if any); no rewriter call.",
+    ),
     size: str | None = typer.Option(None, "--size", help="WIDTHxHEIGHT, multiples of 32."),
     steps: int | None = typer.Option(None, "--steps", help="Sampling steps."),
     seed: int | None = typer.Option(None, "--seed", help="Seed; random (and recorded) if omitted."),
@@ -81,8 +143,9 @@ def generate(
 
     try:
         resolved = cfg.load_settings({"engine": engine_flag(engine, host), "output_dir": out})
+        source = _prompt_source(prompt, prompt_from, rewrite, resolved.settings.rewriter)
         request = run.build_request(
-            prompt,
+            source.prompt,
             resolved,
             size=size,
             steps=steps,
@@ -107,6 +170,10 @@ def generate(
             EXIT_UNAVAILABLE,
         )
 
+    original_prompt = source.original
+    if rewrite:
+        request, original_prompt = _rewrite_request(request, settings.rewriter, quiet)
+
     try:
         figures = run.estimate_memory(load_registry(), engine_name, request)
     except RegistryError as exc:
@@ -117,7 +184,9 @@ def generate(
     with generation_progress(
         quiet=quiet, indeterminate=bool(getattr(backend, "progress_indeterminate", False))
     ) as on_progress:
-        path = run.run_generate(backend, request, settings.output_dir, on_progress)
+        path = run.run_generate(
+            backend, request, settings.output_dir, on_progress, original_prompt=original_prompt
+        )
     if as_json:
         scripting.emit_json(scripting.image_document(path))
     else:

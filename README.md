@@ -134,7 +134,7 @@ lig generate "a lovely cat holding a sign that says 'qwen'" --size 768x768 --ste
 ```
 
 Defaults: Linux 768x768, 30 steps; macOS 1024x1024, 40 steps. Engine `auto` = `default_host` if set,
-else `mlx` on Apple Silicon with the `mlx` extra, else `sdcpp`. Sizes are multiples of 32. `-q` prints only the path. Exit codes: 0, 1, 2, 3, 4.
+else `mlx` on Apple Silicon with the `mlx` extra, else `sdcpp`. Sizes are multiples of 32. `-q` prints only the path. `--rewrite` expands the prompt via the `[rewriter]` LLM endpoint, `--prompt-from FILE.json` reuses a saved one. Exit codes: 0, 1, 2, 3, 4.
 
 ### `lig edit`
 

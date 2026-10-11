@@ -40,6 +40,8 @@ class SidecarSchema(BaseModel):
     source_path: str | None = None
     source_sha256: str | None = None
     batch_id: str | None = None  # shared by every image of one `lig seeds` run
+    # What the user typed when `prompt` is a rewriter's expansion of it (Story 08.1-001).
+    original_prompt: str | None = None
 
 
 def slugify(prompt: str) -> str:
@@ -50,7 +52,10 @@ def slugify(prompt: str) -> str:
 
 
 def sidecar_for(
-    result: ImageResult, created_at: datetime, batch_id: str | None = None
+    result: ImageResult,
+    created_at: datetime,
+    batch_id: str | None = None,
+    original_prompt: str | None = None,
 ) -> SidecarSchema:
     req = result.request
     source = isinstance(req, EditRequest)
@@ -73,6 +78,7 @@ def sidecar_for(
         source_path=str(req.reference_image) if source else None,
         source_sha256=req.reference_sha256 if source else None,
         batch_id=batch_id,
+        original_prompt=original_prompt,
     )
 
 
@@ -98,6 +104,8 @@ def _atomic_write(target: Path, data: bytes) -> None:
 def _png_with_metadata(png: bytes, sidecar: SidecarSchema, sidecar_name: str) -> bytes:
     info = PngInfo()
     info.add_text("lig:prompt", sidecar.prompt)
+    if sidecar.original_prompt is not None:
+        info.add_text("lig:original_prompt", sidecar.original_prompt)
     info.add_text("lig:seed", str(sidecar.seed))
     info.add_text("lig:engine", sidecar.engine)
     info.add_text("lig:sidecar", sidecar_name)
@@ -117,6 +125,7 @@ def write_result(
     *,
     now: datetime | None = None,
     batch_id: str | None = None,
+    original_prompt: str | None = None,
 ) -> Path:
     """Write PNG + sidecar into out_dir (created if missing); return the PNG path.
 
@@ -125,7 +134,7 @@ def write_result(
     """
     out_dir = out_dir or DEFAULT_OUTPUT_DIR
     created_at = now or datetime.now()  # local time, per spec
-    sidecar = sidecar_for(result, created_at, batch_id)
+    sidecar = sidecar_for(result, created_at, batch_id, original_prompt)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     stem = f"{created_at:%Y%m%d-%H%M%S}_{slugify(sidecar.prompt)}_s{sidecar.seed}"
