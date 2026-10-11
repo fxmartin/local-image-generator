@@ -3,6 +3,15 @@
 Sections are generated per release from conventional commits
 (`python scripts/changelog.py X.Y.Z --since vPREV --write`).
 
+## [0.6.0] - 2026-10-11
+
+### Features
+
+- **polish:** daemon job queue (#08.1-002)
+- **polish:** optional prompt rewriter (#08.1-001)
+- **polish:** size-variant contact sheet (#08.1-004)
+- **polish:** openvino backend evaluation deferred, re-check trigger in `docs/bench/xps13.md` (#08.1-005)
+
 ## [0.5.0] - 2026-10-11
 
 ### Features
