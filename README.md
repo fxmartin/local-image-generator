@@ -152,7 +152,7 @@ lig seeds "a lighthouse at dusk" --count 4 --seed-start 100 --size 512x512
 ```
 
 Renders `--count` images (default 4, max 8) with consecutive seeds and a labelled contact sheet (`--no-sheet`
-to skip). Exit codes: 0, 1 (a seed failed; earlier images are kept), 2 (`--count` outside 1-8), 3, 4.
+to skip). Exit codes: 0, 1 (a seed failed; earlier images are kept), 2 (`--count` outside 1-8), 3, 4. `lig sizes PROMPT --seed S --sizes 1024x1024,1536x864`: same seed across sizes (not upscales; see `docs/reference.md`).
 
 ### `lig bench`
 

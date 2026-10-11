@@ -130,6 +130,19 @@ Unless `--no-sheet` is given, the run also writes `<batch_id>_sheet.png`: a near
 the renders (2×2 for 4, 3×3 for up to 8), each tile downscaled to 512 px on its long edge and
 labelled with its seed. Its `.json` sidecar lists the member files and seeds.
 
+## Comparing sizes
+
+`lig sizes PROMPT --sizes WxH,WxH,... [--seed S]` (plus the `generate` flags except `--size` and
+`--seed`) renders the same seed at up to 8 sizes, one after another, e.g.
+`--sizes 1024x1024,1536x864,864x1536` to choose the framing for a slide or a post header. Every
+size is validated first (multiples of 32); a bad or duplicate size exits 2 before anything renders.
+The tiles are not upscales of each other: a larger size yields a new composition, not the same
+picture with more pixels. Each PNG and sidecar carries the same `batch_id`; without `--seed` a
+random one is chosen and printed as `seed: S`.
+
+Unless `--no-sheet` is given, the run writes `<batch_id>_sheet.png`, built like the seeds sheet but
+with each tile labelled `WIDTHxHEIGHT`; its `.json` sidecar lists files, seeds and labels.
+
 ## Diagnostics
 
 `lig doctor` prints platform facts (OS, arch, Vulkan ICD, Metal, oneAPI, RAM total/available,

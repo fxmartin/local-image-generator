@@ -24,6 +24,7 @@ from lig.cli.bench import bench_app
 from lig.cli.edit import edit as edit_command
 from lig.cli.generate import generate as generate_command
 from lig.cli.seeds import seeds as seeds_command
+from lig.cli.sizes import sizes as sizes_command
 from lig.core import config as cfg
 from lig.core import doctor as diag
 from lig.core import memory, run
@@ -100,6 +101,9 @@ app.command("edit")(handle_engine_errors(edit_command))
 
 
 app.command("seeds")(handle_engine_errors(seeds_command))
+
+
+app.command("sizes")(handle_engine_errors(sizes_command))
 
 
 app.add_typer(bench_app, name="bench")
