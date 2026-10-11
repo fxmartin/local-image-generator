@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from lig.series.settings import SeriesSettings
 
 SERIES_FILE = "series.json"
-CONTINUITY_PROMPT = "prompt"  # shared look text + one base seed; the only mode so far
+CONTINUITY_PROMPT = "prompt"  # shared look + one seed; 09.3-001 rejected anchor images
 
 ShotStatus = Literal["done", "failed", "skipped"]
 
