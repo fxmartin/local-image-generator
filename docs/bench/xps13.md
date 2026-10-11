@@ -426,6 +426,35 @@ XPS. Its best measured time is 1248 s for 1024², 40 steps at guidance 1.0,
 about 2× over the 600 s P0-1 target. Story 02.1-004 picks the fallback: a
 smaller default size, fewer steps, or the XPS as a remote-only client.
 
+## OpenVINO / Optimum-Intel (Story 08.1-005): deferred, trigger not met
+
+Checked 2026-10-11 against Intel's primary sources. The story is gated on
+Intel marking the pipeline validated, not on a date, so no run was made.
+
+| Check | Finding |
+|---|---|
+| [`openvino_notebooks/notebooks/qwen-image-2.1`](https://github.com/openvinotoolkit/openvino_notebooks/tree/latest/notebooks/qwen-image-2.1) | Added 2026-09-20 (#3651), last touched 2026-09-23. README still carries "⚠️ EXPERIMENTAL NOTEBOOK: a model that has not been fully validated with OpenVINO". |
+| Install path | Needs upstream Diffusers and Optimum Intel branches, OpenVINO **nightly** builds, and a fallback that unpacks OpenVINO GenAI main-branch CI artifacts. Not a stable, pinnable dependency set. |
+| [optimum-intel #1536](https://github.com/huggingface/optimum-intel/pull/1536) "add Qwen-image" | Closed unmerged (draft), so there is no released Optimum-Intel export for Qwen-Image-2.1. |
+| Intel benchmarks | None published for Lunar Lake (Arc 140V). |
+
+**Bar to beat when the trigger fires.** The current XPS local default for the
+same workload is sd.cpp Vulkan at 1024², 40 steps, cfg 1.0: 1248 s (table
+above). Adoption needs OpenVINO at or under 936 s (≥ 25 % faster) on the same
+settings, measured with `timev.py`. The BF16 checkpoint is 33.1 GB against
+30 GB of RAM, so the run must use the notebook's INT8 or INT4 export; record
+which precision, plus load, first-run and warm-run times.
+
+**What would change the decision** (any one, then pull the story):
+
+- The notebook drops the "EXPERIMENTAL" banner.
+- A released (non-nightly) `openvino-genai` / `optimum-intel` pair supports
+  Qwen-Image-2.1.
+
+**If adopted**, implement an in-process `openvino` adapter following
+`backends/mlx.py`; if it misses 936 s, close the story with the numbers.
+Next check: January 2027 (quarterly).
+
 ## Phase 1 acceptance (Story 05.1-004)
 
 **Status: PASS**, 2026-09-26 on `omarchy-xps13`, `lig` 0.1.0 at `main` `f77a8c9`.

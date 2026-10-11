@@ -30,6 +30,19 @@ class ServeSettings(BaseModel):
     idle_ttl: float = Field(default=600, ge=0)
 
 
+class RewriterSettings(BaseModel):
+    # An OpenAI-compatible server (llama-server, LM Studio, oMLX...); `--rewrite` needs both keys.
+    endpoint: str | None = None
+    model: str | None = None
+
+    @field_validator("endpoint")
+    @classmethod
+    def _http_url(cls, value: str | None) -> str | None:
+        if value is not None and not re.match(r"https?://[^/\s]+", value):
+            raise ValueError(f"must be an http(s) URL, got '{value}'")
+        return value
+
+
 class SdcppSettings(BaseModel):
     # Appended verbatim to the sd-cli argv; an env var is split shell-style.
     extra_args: list[str] = []
@@ -83,6 +96,7 @@ class Settings(BaseModel):
     steps: int = 40
     size: str = "1024x1024"
     serve: ServeSettings = ServeSettings()
+    rewriter: RewriterSettings = RewriterSettings()
     engines: EnginesSettings = EnginesSettings()
 
     @field_validator("size")
@@ -285,6 +299,12 @@ CONFIG_TEMPLATE = """\
 # Seconds a warm (in-process) engine stays loaded after the last job; 0 = unload after every job.
 # No effect on subprocess engines such as sdcpp.
 # idle_ttl = 600
+
+# [rewriter]
+# `lig generate --rewrite` expands the prompt through this OpenAI-compatible chat endpoint
+# (the base URL, e.g. one ending in /v1). Both keys are required for --rewrite.
+# endpoint = "http://localhost:8080/v1"
+# model = "qwen3-8b"
 
 # Named `lig serve` daemons on the tailnet, selected with `--host NAME`.
 # [hosts]

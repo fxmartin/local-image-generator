@@ -6,6 +6,7 @@ import platform as platform_module
 import re
 import sys
 from collections.abc import Callable
+from functools import partial
 from pathlib import Path
 
 from PIL import Image, UnidentifiedImageError
@@ -274,8 +275,13 @@ def run_generate(
     out_dir: Path,
     on_progress: ProgressCallback | None = None,
     writer: Callable[[ImageResult, Path], Path] = write_result,
+    original_prompt: str | None = None,
 ) -> Path:
-    """Generate and persist PNG + sidecar; return the PNG path. Engine errors propagate."""
+    """Generate and persist PNG + sidecar; return the PNG path. Engine errors propagate.
+
+    `original_prompt` is what the user typed when `request.prompt` is a rewrite of it."""
+    if original_prompt is not None:
+        writer = partial(writer, original_prompt=original_prompt)  # type: ignore[call-arg]
     return writer(backend.generate(request, on_progress), out_dir)
 
 

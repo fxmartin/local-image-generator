@@ -60,7 +60,7 @@ entry records its license and the engine build it was measured with (`pinned_eng
 transformer, VAE and ncnn files are under the Qwen Research License (research/evaluation use
 only), not Apache-2.0. The 2.1 VAE is not interchangeable with earlier Qwen-Image VAEs.
 
-Keys: `engine`, `output_dir`, `models_dir`, `default_host`, `hosts.NAME` (a `[hosts]` table of `NAME = "http://host:port"`), `ncnn_binary`, `ncnn_model_dir`, `steps`, `size`, `serve.bind`, `engines.sdcpp.extra_args`, `engines.mlx.quantize`, `engines.mlx.image_strength`.
+Keys: `engine`, `output_dir`, `models_dir`, `default_host`, `hosts.NAME` (a `[hosts]` table of `NAME = "http://host:port"`), `ncnn_binary`, `ncnn_model_dir`, `steps`, `size`, `serve.bind`, `rewriter.endpoint`, `rewriter.model`, `engines.sdcpp.extra_args`, `engines.mlx.quantize`, `engines.mlx.image_strength`.
 The `ncnn` engine needs `ncnn_binary` (or `qwenimage-ncnn-vulkan` on `PATH`) and `ncnn_model_dir` (the `qwenimage21/` folder); it prints no per-step progress, so expect a spinner with elapsed time.
 The `mlx` engine (macOS arm64 only, needs the `mlx` extra) runs mflux's `QwenImage21` in-process and keeps it warm between `lig serve` jobs. `lig edit --engine mlx` maps onto mflux's img2img path
 (`image_path` set to the reference image, `image_strength` from `--strength` or `engines.mlx.image_strength`,
@@ -86,7 +86,7 @@ source; 0.6-0.8 allows a bigger change; above ~0.9 the source barely constrains 
 
 ## Generating
 
-`lig generate PROMPT [--size WxH] [--steps N] [--seed S] [--engine E] [--host NAME [--wait]] [--out DIR] [--negative TEXT] [--guidance G] [--transparent] [--force] [--quiet]`
+`lig generate PROMPT [--rewrite | --prompt-from FILE.json] [--size WxH] [--steps N] [--seed S] [--engine E] [--host NAME [--wait]] [--out DIR] [--negative TEXT] [--guidance G] [--transparent] [--force] [--quiet]`
 writes a PNG and a JSON sidecar to `./outputs` (or `--out` / `output_dir`) and prints the PNG path
 as its last line. Flags override `LIG_*` env, which overrides `config.toml`. On Linux, with no
 `--size`/`--steps` flag or config value, it uses 768x768 and 30 steps (the XPS local fallback).
@@ -95,6 +95,18 @@ as its last line. Flags override `LIG_*` env, which overrides `config.toml`. On 
 in Qwen-Image-2.1's documented alpha form (`This is an RGBA image with transparency. PROMPT. The
 image has alpha channel and the background is transparent.`). Engines without alpha support (`ncnn`)
 exit 4; the sidecar records `transparent`.
+
+`--rewrite` first expands PROMPT through an OpenAI-compatible chat endpoint (llama-server, LM
+Studio, oMLX...) named by `rewriter.endpoint` (the base URL, e.g. `http://localhost:8080/v1`; `/chat/completions`
+is appended) and `rewriter.model` in config (env `LIG_REWRITER__ENDPOINT`, `LIG_REWRITER__MODEL`). The
+expansion is printed to stderr before generation (not with `-q`) and used for the run; the sidecar's
+`prompt` is the expansion and `original_prompt` is what you typed (also the `lig:original_prompt` PNG
+text chunk). The system prompt lives in `lig/core/rewriter.py`. If the endpoint is unreachable or
+answers badly, `lig` asks whether to continue with the original prompt (declining exits 1); with no
+terminal on stdin it warns and continues. `--rewrite` without both config keys exits 2.
+`--prompt-from FILE.json` replaces PROMPT with the `prompt` of a saved sidecar (its expansion, if it
+had one) and makes no rewriter call, so a good expansion is reused for free; it carries
+`original_prompt` forward and cannot be combined with PROMPT or `--rewrite` (exit 2).
 
 Progress goes to stderr: on a terminal, a bar with `step 12/40`, elapsed and ETA (a spinner with
 elapsed time for `ncnn`, which reports no steps), then load and total times. When stdout is not a
