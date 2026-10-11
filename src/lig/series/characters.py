@@ -11,7 +11,6 @@ from pydantic import BaseModel, ValidationError
 from lig.series.settings import EXIT_USAGE, Character, SeriesError
 
 CHARACTER_FILE = "character.json"
-REFERENCE_FILE = "reference.png"
 _NAME_RE = re.compile(r"[a-z0-9][a-z0-9_-]*")
 
 
@@ -57,12 +56,6 @@ def load(key: str) -> SavedCharacter | None:
         raise SeriesError(f"saved character {path} is unreadable: {error}", 1) from error
 
 
-def reference_path(key: str) -> Path | None:
-    """The saved reference image (anchor mode), when there is one."""
-    path = _dir(key) / REFERENCE_FILE
-    return path if path.is_file() else None
-
-
 def save(
     key: str,
     character: Character,
@@ -70,9 +63,8 @@ def save(
     style: str,
     seed: int,
     source_series: str,
-    reference: Path | None = None,
 ) -> Path:
-    """Write `character.json` (and `reference.png` if given); returns the directory."""
+    """Write `character.json`; returns the directory."""
     target = _dir(key)
     target.mkdir(parents=True, exist_ok=True)
     saved = SavedCharacter(
@@ -83,8 +75,6 @@ def save(
         source_series=source_series,
     )
     (target / CHARACTER_FILE).write_text(saved.model_dump_json(indent=2) + "\n")
-    if reference is not None:
-        shutil.copyfile(reference, target / REFERENCE_FILE)
     return target
 
 

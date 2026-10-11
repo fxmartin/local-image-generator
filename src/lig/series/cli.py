@@ -296,9 +296,6 @@ def characters_show(name: str = typer.Argument(...)) -> None:
         typer.echo(f"error: no saved character {name!r}", err=True)
         raise typer.Exit(1)
     typer.echo(saved.model_dump_json(indent=2))
-    reference = characters.reference_path(name)
-    if reference:
-        typer.echo(f"reference: {reference}")
 
 
 @characters_app.command("rm")
