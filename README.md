@@ -254,8 +254,8 @@ lig-series --from-plan series/20260101-120000_paris/plan.json
 
 `--character NAME` makes the character reusable across series. The first time (and only if the
 series finishes cleanly) it saves `character.json` (name, look, style, base seed, source series)
-under `~/.local/share/lig/characters/NAME/` (`$XDG_DATA_HOME/lig/characters/` when set; a
-`reference.png` is stored there too when a reference image exists). Later series with the same
+under `~/.local/share/lig/characters/NAME/` (`$XDG_DATA_HOME/lig/characters/` when set).
+Later series with the same
 `--character` give the saved name and look to the global call as fixed input (they replace
 whatever the model returns) and reuse the saved seed unless `--seed` is passed. Manage them with
 `lig-series characters list`, `characters show NAME` and `characters rm NAME` (`--yes` skips the

@@ -65,7 +65,6 @@ def test_first_run_saves_character(tmp_path):
         "seed": 11,
         "source_series": str(tmp_path / "out"),
     }
-    assert not (folder / "reference.png").exists()
 
 
 def test_second_run_reuses_look_name_and_seed(tmp_path):
@@ -115,17 +114,6 @@ def test_plan_settings_replaces_the_models_look():
     saved = Character(name="Elara", look=SAVED_LOOK)
     settings = plan_settings(Client(), "photos", count=1, character=saved)
     assert settings.character == saved
-
-
-def test_reference_is_saved_and_shown(tmp_path):
-    ref = tmp_path / "ref.png"
-    ref.write_bytes(b"png")
-    characters.save(
-        "elara", Character(name="E", look=SAVED_LOOK), style="s", seed=1, source_series="x",
-        reference=ref,
-    )  # fmt: skip
-    assert characters.reference_path("elara").read_bytes() == b"png"
-    assert "reference:" in runner.invoke(app, ["characters", "show", "elara"]).output
 
 
 @pytest.mark.parametrize("bad", ["../x", "a/b", "", ".hidden", "a b"])
