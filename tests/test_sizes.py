@@ -4,9 +4,14 @@ import pytest
 from PIL import Image
 from typer.testing import CliRunner
 
+from lig.backends.base import EngineError
+from lig.backends.fake import FakeBackend
+from lig.cli import app as cli_app
+from lig.cli import scripting
 from lig.cli.app import app
 from lig.core import run
 from lig.core.sheet import SHEET_TILE_PX, build_sheet
+from lig.models.registry import RegistryError
 
 runner = CliRunner()
 
@@ -114,3 +119,78 @@ def test_build_sheet_uses_label_callback(tmp_path):
     )
     members = json.loads(sheet.with_suffix(".json").read_text())["members"]
     assert [m["label"] for m in members] == ["a-1", "b-2"]
+
+
+def test_seed_out_of_range_exits_2():
+    result = runner.invoke(
+        app, ["sizes", "x", "--sizes", "256x256", "--seed", "-1", "--engine", "fake"]
+    )
+    assert result.exit_code == 2
+
+
+def test_bad_config_exits_2(tmp_path):
+    cfg_dir = tmp_path / "cfg" / "lig"
+    cfg_dir.mkdir(parents=True)
+    (cfg_dir / "config.toml").write_text("this is [not toml")
+    assert _run("--sizes", "256x256").exit_code == 2
+
+
+def test_negative_prompt_warning_at_default_guidance():
+    result = _run("--sizes", "256x256", "--negative", "blurry")
+    assert result.exit_code == 0, result.output
+    assert "negative prompt has no effect" in result.output
+
+
+def test_failure_on_second_size_keeps_first(tmp_path, monkeypatch):
+    real = FakeBackend()
+
+    class Flaky(FakeBackend):
+        def generate(self, request, on_progress):
+            if request.width == 512:
+                raise EngineError("boom", "engine stderr")
+            return real.generate(request, on_progress)
+
+    monkeypatch.setattr(run, "make_backend", lambda *a, **k: Flaky())
+    result = _run("--sizes", "256x256,512x256")
+    assert result.exit_code == 1
+    assert "size 512x256 failed; kept 1 of 2" in result.output
+    assert len(_renders(tmp_path)) == 1
+
+
+def test_registry_error_during_memory_estimate_exits_1(monkeypatch):
+    def boom(*a, **k):
+        raise RegistryError("no such model")
+
+    monkeypatch.setattr(run, "estimate_memory", boom)
+    result = _run("--sizes", "256x256")
+    assert result.exit_code == 1
+    assert "no such model" in result.output
+
+
+def test_memory_preflight_uses_largest_tile(monkeypatch):
+    seen = []
+    monkeypatch.setattr(
+        run,
+        "estimate_memory",
+        lambda reg, eng, req: seen.append((req.width, req.height)) or (10, 1),
+    )
+    calls = []
+    monkeypatch.setattr(cli_app, "memory_preflight", lambda *a: calls.append(a))
+    result = _run("--sizes", "256x256,512x256", "--force")
+    assert result.exit_code == 0, result.output
+    assert seen == [(512, 256)]
+    assert calls == [(10, 1, True)]
+
+
+def test_open_launches_viewer_on_sheet(monkeypatch):
+    launched = []
+    monkeypatch.setattr(scripting, "_popen", lambda argv, **_: launched.append(argv))
+    assert _run("--sizes", "256x256,512x256", "--open").exit_code == 0
+    assert len(launched) == 1 and "_sheet" in launched[0][-1]
+
+
+def test_open_without_sheet_launches_each_render(monkeypatch):
+    launched = []
+    monkeypatch.setattr(scripting, "_popen", lambda argv, **_: launched.append(argv))
+    assert _run("--sizes", "256x256,512x256", "--no-sheet", "--open").exit_code == 0
+    assert len(launched) == 2

@@ -152,19 +152,7 @@ lig seeds "a lighthouse at dusk" --count 4 --seed-start 100 --size 512x512
 ```
 
 Renders `--count` images (default 4, max 8) with consecutive seeds and a labelled contact sheet (`--no-sheet`
-to skip). Exit codes: 0, 1 (a seed failed; earlier images are kept), 2 (`--count` outside 1-8), 3, 4.
-
-### `lig sizes`
-
-```sh
-lig sizes "a lighthouse at dusk" --seed 42 --sizes 1024x1024,1536x864,864x1536
-```
-
-Renders one seed at each size (1-8, multiples of 32) and composes a contact sheet labelled by size
-(`--no-sheet` to skip), to pick a framing in one pass. The tiles are not upscales of each other:
-each size is its own render, so a larger size yields a new composition. Without `--seed` a random
-one is chosen and printed. Exit codes: 0, 1 (a size failed; earlier images are kept), 2 (bad or
-duplicate size, more than 8), 3, 4.
+to skip). Exit codes: 0, 1 (a seed failed; earlier images are kept), 2 (`--count` outside 1-8), 3, 4. `lig sizes PROMPT --seed S --sizes 1024x1024,1536x864`: same seed across sizes (not upscales; see `docs/reference.md`).
 
 ### `lig bench`
 
