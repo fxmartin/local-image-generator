@@ -8,6 +8,7 @@ from pathlib import Path
 import typer
 
 from lig.backends.base import EngineError
+from lig.cli import scripting
 from lig.cli.generate import EXIT_USAGE, _fail, open_backend
 from lig.cli.progress import generation_progress
 from lig.core import config as cfg
@@ -30,7 +31,10 @@ def seeds(
     size: str | None = typer.Option(None, "--size", help="WIDTHxHEIGHT, multiples of 32."),
     steps: int | None = typer.Option(None, "--steps", help="Sampling steps."),
     engine: str | None = typer.Option(
-        None, "--engine", help="Engine: auto, sdcpp, ncnn, mlx, fake or remote."
+        None,
+        "--engine",
+        help="Engine: auto, sdcpp, ncnn, mlx, fake or remote.",
+        autocompletion=scripting.complete_engine,
     ),
     out: Path | None = typer.Option(None, "--out", help="Output directory."),  # noqa: B008
     negative: str | None = typer.Option(None, "--negative", help="Negative prompt."),
@@ -38,6 +42,8 @@ def seeds(
     no_sheet: bool = typer.Option(False, "--no-sheet", help="Skip the contact sheet."),
     force: bool = typer.Option(False, "--force", help="Run even if memory looks too tight."),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Print only the output paths."),
+    as_json: bool = typer.Option(False, "--json", help=scripting.JSON_HELP),
+    open_: bool = typer.Option(False, "--open", help=scripting.OPEN_HELP),
 ) -> None:
     """Render PROMPT under consecutive seeds, one after the other."""
     from lig.cli.app import memory_preflight  # late: app imports this module
@@ -89,7 +95,7 @@ def seeds(
     if figures is not None:
         memory_preflight(figures[0], figures[1], force)
 
-    if random_start and not quiet:
+    if random_start and not quiet and not as_json:
         typer.echo(f"seed start: {seed_start}")
     batch_id = uuid.uuid4().hex
     writer = partial(write_result, batch_id=batch_id)
@@ -105,6 +111,19 @@ def seeds(
             )
             raise
         members.append((path, request.seed))
-        typer.echo(str(path))
-    if not no_sheet:
-        typer.echo(str(build_sheet(members, settings.output_dir, batch_id)))
+        if not as_json:
+            typer.echo(str(path))
+    sheet = None if no_sheet else build_sheet(members, settings.output_dir, batch_id)
+    if as_json:
+        scripting.emit_json(
+            {
+                "seed_start": seed_start,
+                "images": [scripting.image_document(path) for path, _ in members],
+                "sheet": str(sheet) if sheet else None,
+            }
+        )
+    elif sheet:
+        typer.echo(str(sheet))
+    if open_:
+        for path in [sheet] if sheet else [path for path, _ in members]:
+            scripting.open_in_viewer(path)

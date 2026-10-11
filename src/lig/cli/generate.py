@@ -5,6 +5,7 @@ from pathlib import Path
 import typer
 
 from lig.backends.base import Backend, EngineUnavailable
+from lig.cli import scripting
 from lig.cli.progress import generation_progress
 from lig.core import config as cfg
 from lig.core import run
@@ -56,9 +57,14 @@ def generate(
     steps: int | None = typer.Option(None, "--steps", help="Sampling steps."),
     seed: int | None = typer.Option(None, "--seed", help="Seed; random (and recorded) if omitted."),
     engine: str | None = typer.Option(
-        None, "--engine", help="Engine: auto, sdcpp, ncnn, mlx, fake or remote."
+        None,
+        "--engine",
+        help="Engine: auto, sdcpp, ncnn, mlx, fake or remote.",
+        autocompletion=scripting.complete_engine,
     ),
-    host: str | None = typer.Option(None, "--host", help=HOST_HELP),
+    host: str | None = typer.Option(
+        None, "--host", help=HOST_HELP, autocompletion=scripting.complete_host
+    ),
     out: Path | None = typer.Option(None, "--out", help="Output directory."),  # noqa: B008
     negative: str | None = typer.Option(None, "--negative", help="Negative prompt."),
     guidance: float | None = typer.Option(None, "--guidance", help="Guidance scale."),
@@ -67,6 +73,8 @@ def generate(
     ),
     force: bool = typer.Option(False, "--force", help="Run even if memory looks too tight."),
     quiet: bool = typer.Option(False, "--quiet", "-q", help="Print only the final path."),
+    as_json: bool = typer.Option(False, "--json", help=scripting.JSON_HELP),
+    open_: bool = typer.Option(False, "--open", help=scripting.OPEN_HELP),
 ) -> None:
     """Generate an image from a text prompt."""
     from lig.cli.app import memory_preflight  # late: app imports this module
@@ -110,4 +118,9 @@ def generate(
         quiet=quiet, indeterminate=bool(getattr(backend, "progress_indeterminate", False))
     ) as on_progress:
         path = run.run_generate(backend, request, settings.output_dir, on_progress)
-    typer.echo(str(path))
+    if as_json:
+        scripting.emit_json(scripting.image_document(path))
+    else:
+        typer.echo(str(path))
+    if open_:
+        scripting.open_in_viewer(path)

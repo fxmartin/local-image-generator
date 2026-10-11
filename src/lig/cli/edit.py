@@ -5,6 +5,7 @@ from pathlib import Path
 import typer
 
 from lig.backends.base import EngineUnavailable
+from lig.cli import scripting
 from lig.cli.generate import EXIT_UNAVAILABLE, EXIT_USAGE, HOST_HELP, _fail, engine_flag
 from lig.cli.progress import generation_progress
 from lig.core import config as cfg
@@ -22,14 +23,21 @@ def edit(
     steps: int | None = typer.Option(None, "--steps", help="Sampling steps."),
     seed: int | None = typer.Option(None, "--seed", help="Seed; random (and recorded) if omitted."),
     engine: str | None = typer.Option(
-        None, "--engine", help="Engine: auto, sdcpp, ncnn, mlx, fake or remote."
+        None,
+        "--engine",
+        help="Engine: auto, sdcpp, ncnn, mlx, fake or remote.",
+        autocompletion=scripting.complete_engine,
     ),
     strength: float | None = typer.Option(
         None, "--strength", help="How far to move from the source, 0.0 to 1.0."
     ),
-    host: str | None = typer.Option(None, "--host", help=HOST_HELP),
+    host: str | None = typer.Option(
+        None, "--host", help=HOST_HELP, autocompletion=scripting.complete_host
+    ),
     out: Path | None = typer.Option(None, "--out", help="Output directory."),  # noqa: B008
     force: bool = typer.Option(False, "--force", help="Run even if memory looks too tight."),
+    as_json: bool = typer.Option(False, "--json", help=scripting.JSON_HELP),
+    open_: bool = typer.Option(False, "--open", help=scripting.OPEN_HELP),
 ) -> None:
     """Edit an existing image with a prompt."""
     from lig.cli.app import memory_preflight  # late: app imports this module
@@ -83,4 +91,9 @@ def edit(
         ),
     ) as on_progress:
         path = run.run_edit(backend, request, settings.output_dir, on_progress)
-    typer.echo(str(path))
+    if as_json:
+        scripting.emit_json(scripting.image_document(path))
+    else:
+        typer.echo(str(path))
+    if open_:
+        scripting.open_in_viewer(path)

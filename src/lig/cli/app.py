@@ -19,6 +19,7 @@ from rich.text import Text
 from lig import __version__
 from lig.backends.base import Backend, EngineError
 from lig.backends.registry import BACKENDS
+from lig.cli import scripting
 from lig.cli.bench import bench_app
 from lig.cli.edit import edit as edit_command
 from lig.cli.generate import generate as generate_command
@@ -110,7 +111,12 @@ app.add_typer(models_app, name="models")
 
 @models_app.command("list")
 def models_list(
-    engine: str | None = typer.Option(None, "--engine", help="Only show this engine's artifacts."),
+    engine: str | None = typer.Option(
+        None,
+        "--engine",
+        help="Only show this engine's artifacts.",
+        autocompletion=scripting.complete_engine,
+    ),
     as_json: bool = typer.Option(False, "--json", help="Emit JSON instead of a table."),
 ) -> None:
     """Show each artifact's state, size and license, plus cache size and free disk."""
@@ -145,9 +151,15 @@ def models_list(
 
 @models_app.command("pull")
 def models_pull(
-    name: str | None = typer.Argument(None, help="Artifact name to download."),
+    name: str | None = typer.Argument(
+        None, help="Artifact name to download.", autocompletion=scripting.complete_artifact
+    ),
     engine: str | None = typer.Option(
-        None, "--for", "--engine", help="Download the set this engine needs on this platform."
+        None,
+        "--for",
+        "--engine",
+        help="Download the set this engine needs on this platform.",
+        autocompletion=scripting.complete_engine,
     ),
     quant: str | None = typer.Option(
         None, "--quant", help="Pick the engine's set with this quantization (default: registry's)."
@@ -261,7 +273,11 @@ def _lookup(registry: Any, name: str) -> Any:
 
 @models_app.command("verify")
 def models_verify(
-    name: str | None = typer.Argument(None, help="Artifact to check; default: all installed."),
+    name: str | None = typer.Argument(
+        None,
+        help="Artifact to check; default: all installed.",
+        autocompletion=scripting.complete_artifact,
+    ),
 ) -> None:
     """Re-hash installed artifacts; exit 1 on any sha256 mismatch."""
     registry, models_dir, _ = _load_cache()
@@ -300,7 +316,9 @@ def models_verify(
 
 @models_app.command("rm")
 def models_rm(
-    name: str = typer.Argument(..., help="Artifact to delete."),
+    name: str = typer.Argument(
+        ..., help="Artifact to delete.", autocompletion=scripting.complete_artifact
+    ),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip the confirmation prompt."),
 ) -> None:
     """Delete an artifact (and any partial download) from the cache."""
@@ -366,7 +384,11 @@ def models_prune(
 
 
 @models_app.command("path")
-def models_path(name: str = typer.Argument(..., help="Artifact name.")) -> None:
+def models_path(
+    name: str = typer.Argument(
+        ..., help="Artifact name.", autocompletion=scripting.complete_artifact
+    ),
+) -> None:
     """Print an installed artifact's absolute path; exit 1 (silently) if it is not installed."""
     registry, models_dir, _ = _load_cache()
     artifact = _lookup(registry, name)
@@ -482,7 +504,10 @@ def config_init() -> None:
 @handle_engine_errors
 def serve(
     engine: str | None = typer.Option(
-        None, "--engine", help="Local engine to serve; default: the configured engine."
+        None,
+        "--engine",
+        help="Local engine to serve; default: the configured engine.",
+        autocompletion=scripting.complete_engine,
     ),
     bind: str | None = typer.Option(
         None,

@@ -8,6 +8,7 @@ from rich.table import Table
 from rich.text import Text
 
 from lig.backends.registry import BACKENDS
+from lig.cli import scripting
 from lig.core import bench as core
 from lig.core import config as cfg
 from lig.core import run
@@ -36,9 +37,13 @@ def bench(
     steps: int | None = typer.Option(None, "--steps", help="Sampling steps."),
     runs: int = typer.Option(1, "--runs", help="Runs per engine; the median is reported."),
     host: str | None = typer.Option(
-        None, "--host", help="Bench the remote engine on this `lig serve` host (a [hosts] name)."
+        None,
+        "--host",
+        help="Bench the remote engine on this `lig serve` host (a [hosts] name).",
+        autocompletion=scripting.complete_host,
     ),
     out: Path = typer.Option(Path("bench"), "--out", help="Directory for the JSON file."),  # noqa: B008
+    as_json: bool = typer.Option(False, "--json", help="Print the report JSON instead of a table."),
 ) -> None:
     """Run a fixed prompt and seed on each engine, print a table, write bench/<date>_<host>.json."""
     if ctx.invoked_subcommand is not None:
@@ -70,10 +75,14 @@ def bench(
         request,
         runs,
     )
-    _print_report(report)
+    if not as_json:
+        _print_report(report)
     if not report.results:
         raise _fail("no engine ran; run `lig doctor` for details", EXIT_UNAVAILABLE)
-    typer.echo(f"wrote {core.write_report(out, report)}")
+    written = core.write_report(out, report)
+    if as_json:
+        scripting.emit_json(report.model_dump(mode="json"))
+    typer.echo(f"wrote {written}", err=as_json)
 
 
 def _print_report(report: core.BenchReport) -> None:
