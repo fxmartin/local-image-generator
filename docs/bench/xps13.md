@@ -435,13 +435,14 @@ Intel marking the pipeline validated, not on a date, so no run was made.
 |---|---|
 | [`openvino_notebooks/notebooks/qwen-image-2.1`](https://github.com/openvinotoolkit/openvino_notebooks/tree/latest/notebooks/qwen-image-2.1) | Added 2026-09-20 (#3651), last touched 2026-09-23. README still carries "⚠️ EXPERIMENTAL NOTEBOOK: a model that has not been fully validated with OpenVINO". |
 | Install path | Needs upstream Diffusers and Optimum Intel branches, OpenVINO **nightly** builds, and a fallback that unpacks OpenVINO GenAI main-branch CI artifacts. Not a stable, pinnable dependency set. |
-| [optimum-intel #1536](https://github.com/huggingface/optimum-intel/pull/1536) "add Qwen-image" | Closed unmerged (draft), so there is no released Optimum-Intel export for Qwen-Image-2.1. |
+| [optimum-intel #1790](https://github.com/huggingface/optimum-intel/pull/1790) "Support Qwen-Image" | Merged 2026-08-07, released in `optimum-intel` 2.2.0 (2026-09-17). Original Qwen-Image only. (The earlier draft #1536 was closed unmerged on 2026-08-06.) |
+| [optimum-intel #2006](https://github.com/huggingface/optimum-intel/pull/2006) "Support Qwen-Image-2.1" | Merged to `main` 2026-09-19, two days after 2.2.0, so in no release yet. Adds the `optimum-cli export openvino` path (INT4 shown) and `OVQwenImage21Pipeline` / `OVQwenImage21Img2ImgPipeline`. `diffusers` 0.41.0 (2026-10-06) already ships `QwenImage21Pipeline`. |
+| `openvino-genai` 2026.4.1.0 (2026-10-01) | No Qwen-Image-2.1 support: `Text2ImagePipeline` dispatches `QwenImagePipeline` (original Qwen-Image) only, while the 2.1 checkpoint's `model_index.json` declares `QwenImage21Pipeline`. |
 | Intel benchmarks | None published for Lunar Lake (Arc 140V). |
 
-**Bar to beat when the trigger fires.** The current XPS local default for the
-same workload is sd.cpp Vulkan at 1024², 40 steps, cfg 1.0: 1248 s (table
-above). Adoption needs OpenVINO at or under 936 s (≥ 25 % faster) on the same
-settings, measured with `timev.py`. The BF16 checkpoint is 33.1 GB against
+**Bar to beat when the trigger fires.** The XPS baseline at 1024², 40 steps is
+sd.cpp Vulkan, cfg 1.0: 1248 s (table above). Adoption needs OpenVINO at or
+under 936 s (≥ 25 % faster) on the same settings, measured with `timev.py`. The BF16 checkpoint is 33.1 GB against
 30 GB of RAM, so the run must use the notebook's INT8 or INT4 export; record
 which precision, plus load, first-run and warm-run times.
 
@@ -449,11 +450,13 @@ which precision, plus load, first-run and warm-run times.
 
 - The notebook drops the "EXPERIMENTAL" banner.
 - A released (non-nightly) `openvino-genai` / `optimum-intel` pair supports
-  Qwen-Image-2.1.
+  Qwen-Image-2.1. This is the closer trigger: `optimum-intel` #2006 only
+  waits for the next release after 2.2.0.
 
 **If adopted**, implement an in-process `openvino` adapter following
 `backends/mlx.py`; if it misses 936 s, close the story with the numbers.
-Next check: January 2027 (quarterly).
+Next check: the next `optimum-intel` release after 2.2.0, else January 2027
+(quarterly).
 
 ## Phase 1 acceptance (Story 05.1-004)
 
