@@ -1,3 +1,3 @@
 """lig — local image generation CLI for Qwen-Image-2.1."""
 
-__version__ = "0.4.2"
+__version__ = "0.5.0"

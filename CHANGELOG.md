@@ -3,6 +3,12 @@
 Sections are generated per release from conventional commits
 (`python scripts/changelog.py X.Y.Z --since vPREV --write`).
 
+## [0.5.0] - 2026-10-11
+
+### Features
+
+- **cli:** --json, --open and dynamic shell completion (#08.1-003)
+
 ## [0.4.2] - 2026-10-11
 
 ### Bug fixes
