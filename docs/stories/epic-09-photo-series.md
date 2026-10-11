@@ -21,7 +21,7 @@
 - **Code writes the prompts.** Every final prompt is assembled deterministically, with the character's look text copied verbatim into each one. Continuity never depends on the model repeating itself.
 - **Continuity has three layers:**
   - the same look text, style and seed in every shot (09.1-003, 09.2-001);
-  - an optional anchor reference image, decided by a spike (09.3-001, 09.3-002);
+  - an optional anchor reference image, decided by a spike (09.3-001, 09.3-002): rejected, prompt mode only;
   - saved characters, reused across series (09.3-003).
 
 ## Epic Scope
@@ -273,6 +273,8 @@
 **Dependencies**: 09.3-001
 **Risk Level**: Medium
 
+**Result** (2026-10-11): shrunk to 1 point per the technical notes, since 09.3-001 rejected both anchor variants. No `--continuity` flag: prompt mode is the only mode, documented in the README and `series.json`.
+
 ##### Story 09.3-003: Reusable characters across series
 **Status**: Done
 **User Story**: As FX, I want `--character NAME` to save the character's look, name and reference image the first time, and reuse them in every later series, so that the same person appears in all my series, not only within one.
@@ -353,5 +355,5 @@
 MVP (9 stories): 09.1-001, 09.1-002, 09.1-003, 09.1-004, 09.2-001, 09.2-002, 09.2-003, 09.3-003, 09.4-001.
 
 ## Epic Progress
-- [ ] 09.1-001 (3) · [ ] 09.1-002 (5) · [ ] 09.1-003 (2) · [ ] 09.1-004 (3) · [ ] 09.2-001 (5) · [ ] 09.2-002 (2) · [ ] 09.2-003 (3) · [ ] 09.2-004 (2) · [x] 09.3-001 (3) · [ ] 09.3-002 (5) · [ ] 09.3-003 (3) · [ ] 09.4-001 (2) · [ ] 09.4-002 (2)
+- [ ] 09.1-001 (3) · [ ] 09.1-002 (5) · [ ] 09.1-003 (2) · [ ] 09.1-004 (3) · [ ] 09.2-001 (5) · [ ] 09.2-002 (2) · [ ] 09.2-003 (3) · [ ] 09.2-004 (2) · [x] 09.3-001 (3) · [x] 09.3-002 (1) · [ ] 09.3-003 (3) · [ ] 09.4-001 (2) · [ ] 09.4-002 (2)
 - **Completed**: 0 / 40 points
