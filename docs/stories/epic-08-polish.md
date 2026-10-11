@@ -55,6 +55,8 @@
 - [ ] User-facing docs updated in the same commit for behavior-changing diffs (README/docs/usage/help; CHANGELOG excluded — Epic-05 owns it)
 
 **Dependencies**: 06.2-003, 06.3-001
+
+**Result** (2026-10-11): verified on the M3 Max against `lig serve` from `main`: two `?queue=1` jobs ran in order beside a blocking `lig generate`; cancelling a queued job and a running one (stopped at step 16/40) both give `cancelled`; DELETE on a finished job is 409, an unknown id 404; the engine stays loaded and healthy afterwards.
 **Risk Level**: Medium
 
 ##### Story 08.1-003: Scripting conveniences: `--json`, `--open`, shell completion
@@ -121,8 +123,9 @@
 ## Sprint Breakdown
 | Sprint | Stories | Points | Status |
 |---|---|---|---|
-| Backlog | 08.1-001, 08.1-002, 08.1-003, 08.1-004, 08.1-005 | 20 | Not planned |
+| v0.5.0–v0.6.0 | 08.1-001, 08.1-002, 08.1-003, 08.1-004 | 15 | Done |
+| Backlog | 08.1-005 | 5 | Deferred (trigger in `docs/bench/xps13.md`) |
 
 ## Epic Progress
-- [ ] 08.1-001 (5) · [ ] 08.1-002 (5) · [x] 08.1-003 (3) · [ ] 08.1-004 (2) · [ ] 08.1-005 (5)
-- **Completed**: 3 / 20 points
+- [x] 08.1-001 (5) · [x] 08.1-002 (5) · [x] 08.1-003 (3) · [x] 08.1-004 (2) · [ ] 08.1-005 (5, deferred)
+- **Completed**: 15 / 20 points
