@@ -86,7 +86,7 @@ source; 0.6-0.8 allows a bigger change; above ~0.9 the source barely constrains 
 
 ## Generating
 
-`lig generate PROMPT [--size WxH] [--steps N] [--seed S] [--engine E] [--host NAME] [--out DIR] [--negative TEXT] [--guidance G] [--transparent] [--force] [--quiet]`
+`lig generate PROMPT [--size WxH] [--steps N] [--seed S] [--engine E] [--host NAME [--wait]] [--out DIR] [--negative TEXT] [--guidance G] [--transparent] [--force] [--quiet]`
 writes a PNG and a JSON sidecar to `./outputs` (or `--out` / `output_dir`) and prints the PNG path
 as its last line. Flags override `LIG_*` env, which overrides `config.toml`. On Linux, with no
 `--size`/`--steps` flag or config value, it uses 768x768 and 30 steps (the XPS local fallback).
@@ -104,6 +104,21 @@ TTY or `NO_COLOR` is set, it prints plain lines at most once per 10 % with no AN
 Exit codes: 0 ok, 1 engine error, 2 usage (bad size, unknown engine, invalid config), 3 memory
 pre-flight refusal (`--force` overrides), 4 engine unavailable (the message carries the reason;
 run `lig doctor`). A negative prompt does nothing at guidance 1, so `lig` warns and suggests `--guidance`.
+
+## Job queue (`lig serve`)
+
+`POST /v1/generate?queue=1` puts the job on the daemon's in-memory queue (one job runs at a
+time) and answers `202` at once with `{"id", "state", "position"}` and a `Location` header, so two
+clients or a `lig seeds` batch never hold a connection on the lock. `GET /v1/jobs/{id}` returns
+`{"id", "state", "position", "progress": {step, total, elapsed}}` plus `result` (the same envelope
+as `/v1/generate`) once `done`, or `error {message, log_tail}` when `failed`; `state` is one of
+`queued`, `running`, `done`, `failed`, `cancelled`, and `position` counts the jobs ahead of it
+(`0` = running). `DELETE /v1/jobs/{id}` cancels a queued or running job (the engine is aborted
+at its next step) and answers `409` for one that already finished. Jobs are kept in memory only:
+a daemon restart loses them and clients get `404`; the last 32 finished jobs are retained.
+`lig generate --host NAME --wait` uses this path: it queues the job, polls it, shows the same
+progress bar, and cancels the job on the daemon if you press Ctrl-C. `--wait` needs the remote
+engine (exit 2 otherwise); `lig edit` is not queued.
 
 ## Comparing seeds
 

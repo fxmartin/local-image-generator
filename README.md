@@ -204,11 +204,11 @@ hint otherwise). `GET /v1/health` returns engine, engine version, weights, `load
 `transparent`, `strength`) run the job and return a JSON envelope `{"metadata": {...sidecar
 fields, "remote_host"}, "png_base64": "..."}`. An invalid size is a 422 with the CLI's message;
 an engine failure is a 500 with `error`, `log_tail` (last 20 lines) and the server-side
-`log_path`; an upload over 50 MB is a 413. Jobs run one at a time; concurrent requests wait.
-`POST /v1/generate?stream=1` answers with server-sent events instead: one
-`progress {step, total, elapsed}` per step, then a final `result {metadata, png_b64}` or
-`error {message, log_tail}`. If the client disconnects mid-run the engine is cancelled and the
-lock is released.
+`log_path`; an upload over 50 MB is a 413. Jobs run one at a time; others wait. `?stream=1` answers with server-sent events instead: one `progress {step, total, elapsed}` per
+step, then `result {metadata, png_b64}` or `error {message, log_tail}`; a client that disconnects
+mid-run cancels the engine and frees the lock. `?queue=1` queues the job (`202` + job id and
+position; poll `GET /v1/jobs/{id}`, cancel with `DELETE`); `lig generate --host NAME --wait`
+follows it.
 
 An in-process (warm) engine stays loaded between jobs, so a second job within the idle TTL
 reports `load_s ≈ 0`; after `--idle-ttl` seconds (default `serve.idle_ttl` = 600) with no job it

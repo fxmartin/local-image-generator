@@ -216,11 +216,16 @@ def resolve_host(settings: cfg.Settings, host: str | None) -> tuple[str, str]:
 
 
 def make_backend(
-    name: str, settings: cfg.Settings, *, verbose: bool = False, host: str | None = None
+    name: str,
+    settings: cfg.Settings,
+    *,
+    verbose: bool = False,
+    host: str | None = None,
+    wait: bool = False,
 ) -> Backend:
     """Instantiate the named engine; an unknown name raises."""
     if name == "remote":
-        return RemoteBackend(*resolve_host(settings, host))
+        return RemoteBackend(*resolve_host(settings, host), wait=wait)
     if name not in BACKENDS:
         raise UsageError(f"unknown engine '{name}'; known engines: {', '.join(sorted(BACKENDS))}")
     if name == "sdcpp":
