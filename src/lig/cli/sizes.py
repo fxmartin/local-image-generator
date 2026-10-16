@@ -50,7 +50,7 @@ def sizes(
     as_json: bool = typer.Option(False, "--json", help=scripting.JSON_HELP),
     open_: bool = typer.Option(False, "--open", help=scripting.OPEN_HELP),
 ) -> None:
-    """Render PROMPT with one seed at several sizes and compose a sheet labelled by size.
+    """Render PROMPT with one seed at several sizes, side by side in a sheet labelled by size.
 
     The tiles are not upscales of each other: each size is its own render, so a larger
     size gives a new composition rather than the same picture with more pixels.
