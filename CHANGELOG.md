@@ -3,6 +3,13 @@
 Sections are generated per release from conventional commits
 (`python scripts/changelog.py X.Y.Z --since vPREV --write`).
 
+## [0.6.1] - 2026-10-30
+
+### Bug fixes
+
+- **llm:** send an api key to the larm gateway, retry when busy
+- **sizes:** lay mixed-size tiles in one row, no grid gaps
+
 ## [0.6.0] - 2026-10-11
 
 ### Features
