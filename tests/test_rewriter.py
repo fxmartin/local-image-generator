@@ -30,6 +30,77 @@ def _chat_reply(content: str):
 # --- core.rewriter -----------------------------------------------------------------------------
 
 
+def test_api_key_is_sent_as_bearer_and_absent_without_one():
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return _chat_reply("x y")(request)
+
+    rewriter.rewrite_prompt("p", ENDPOINT, "m", client=_client(handler), api_key="sk-1")
+    rewriter.rewrite_prompt("p", ENDPOINT, "m", client=_client(handler))
+    assert seen[0].headers["authorization"] == "Bearer sk-1"
+    assert "authorization" not in seen[1].headers
+
+
+def test_rejected_key_says_where_the_key_comes_from():
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(401, json={"error": {"message": "invalid api key"}})
+
+    with pytest.raises(rewriter.RewriterError) as info:
+        rewriter.rewrite_prompt("p", ENDPOINT, "m", client=_client(handler))
+    message = str(info.value)
+    assert "rejected the API key (HTTP 401)" in message
+    assert "LIG_LLM_API_KEY" in message and "llm.key" in message
+
+
+@pytest.mark.parametrize("status", [429, 503])
+def test_busy_gateway_is_retried_once_after_retry_after(status, monkeypatch):
+    waits: list[float] = []
+    monkeypatch.setattr(rewriter, "_sleep", waits.append)
+    replies = iter([httpx.Response(status, headers={"retry-after": "3"}), None])
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return next(replies) or _chat_reply(EXPANDED)(request)
+
+    assert rewriter.rewrite_prompt("p", ENDPOINT, "m", client=_client(handler)) == EXPANDED
+    assert waits == [3.0]
+
+
+@pytest.mark.parametrize(
+    ("header", "wait"),
+    [
+        ({}, rewriter.RETRY_DEFAULT_S),
+        ({"retry-after": "999"}, rewriter.RETRY_MAX_S),
+        ({"retry-after": "soon"}, rewriter.RETRY_DEFAULT_S),
+    ],
+)
+def test_retry_wait_defaults_and_is_capped(header, wait, monkeypatch):
+    waits: list[float] = []
+    monkeypatch.setattr(rewriter, "_sleep", waits.append)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(503, headers=header)
+
+    with pytest.raises(rewriter.RewriterError, match="HTTP 503"):
+        rewriter.rewrite_prompt("p", ENDPOINT, "m", client=_client(handler))
+    assert waits == [wait]  # one retry, then give up
+
+
+def test_other_errors_are_not_retried(monkeypatch):
+    waits: list[float] = []
+    monkeypatch.setattr(rewriter, "_sleep", waits.append)
+    calls: list[int] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        return httpx.Response(500)
+
+    with pytest.raises(rewriter.RewriterError):
+        rewriter.rewrite_prompt("p", ENDPOINT, "m", client=_client(handler))
+    assert calls == [1] and waits == []
+
+
 def test_rewrite_posts_chat_completion_and_returns_text():
     seen: list[httpx.Request] = []
 
@@ -153,8 +224,8 @@ def _patch_rewriter(monkeypatch, handler):
     monkeypatch.setattr(
         generate_cmd.rewriter,
         "rewrite_prompt",
-        lambda prompt, endpoint, model, client=None: real(
-            prompt, endpoint, model, client=_client(handler)
+        lambda prompt, endpoint, model, client=None, **kwargs: real(
+            prompt, endpoint, model, client=_client(handler), **kwargs
         ),
     )
 
@@ -260,3 +331,17 @@ def test_prompt_source_conflicts_are_usage_errors(cli_env, args):
     (cli_env / "saved.json").write_text(json.dumps({"prompt": "p"}))
     result = runner.invoke(app, args)
     assert result.exit_code == 2, result.output
+
+
+def test_generate_sends_the_configured_key(cli_env, monkeypatch):
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return _chat_reply(EXPANDED)(request)
+
+    _patch_rewriter(monkeypatch, handler)
+    monkeypatch.setenv("LIG_LLM_API_KEY", "sk-cli")
+    result = runner.invoke(app, ["generate", "a lighthouse", "--engine", "fake", "--rewrite"])
+    assert result.exit_code == 0, result.output
+    assert seen[0].headers["authorization"] == "Bearer sk-cli"

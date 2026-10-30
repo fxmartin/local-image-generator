@@ -31,7 +31,7 @@ class ServeSettings(BaseModel):
 
 
 class RewriterSettings(BaseModel):
-    # An OpenAI-compatible server (llama-server, LM Studio, oMLX...); `--rewrite` needs both keys.
+    # An OpenAI-compatible server (the larm gateway, llama-server...); `--rewrite` needs both keys.
     endpoint: str | None = None
     model: str | None = None
 
@@ -302,9 +302,11 @@ CONFIG_TEMPLATE = """\
 
 # [rewriter]
 # `lig generate --rewrite` expands the prompt through this OpenAI-compatible chat endpoint
-# (the base URL, e.g. one ending in /v1). Both keys are required for --rewrite.
-# endpoint = "http://localhost:8080/v1"
-# model = "qwen3-8b"
+# (the base URL, e.g. one ending in /v1). Both keys are required for --rewrite. The larm
+# gateway on the M3 Max needs an API key: put it in LIG_LLM_API_KEY or in llm.key beside this
+# file (chmod 600), never here. lig-series hands the same key to `gemma`.
+# endpoint = "http://100.84.13.82:8800/v1"
+# model = "gemma-4"
 
 # Named `lig serve` daemons on the tailnet, selected with `--host NAME`.
 # [hosts]
