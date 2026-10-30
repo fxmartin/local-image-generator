@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from lig.core import llm_key
+from lig.series import gemma
 from lig.series.gemma import GemmaClient, GemmaError, GemmaNotFound
 
 STUB = Path(__file__).parent / "stubs" / "gemma_stub.py"
@@ -95,3 +97,60 @@ def test_os_error_launching_is_a_gemma_error(stub_bin_dir, monkeypatch):
     monkeypatch.setattr("lig.series.gemma.subprocess.run", boom)
     with pytest.raises(GemmaError, match="could not run gemma: exec format error"):
         GemmaClient().complete("s", "r", temperature=0.1, max_tokens=1)
+
+
+@pytest.fixture
+def no_wait(monkeypatch: pytest.MonkeyPatch) -> list[float]:
+    waits: list[float] = []
+    monkeypatch.setattr(gemma, "_sleep", waits.append)
+    return waits
+
+
+@pytest.mark.parametrize("code", ["429", "503"])
+def test_busy_gateway_is_retried_once(code, stub_bin_dir, read_stub_argv, no_wait, monkeypatch):
+    monkeypatch.setenv("STUB_FAIL_HTTP", code)
+    monkeypatch.setenv("STUB_GEMMA_REPLY", "ok")
+    assert GemmaClient().complete("s", "r", temperature=0.1, max_tokens=1) == "ok"
+    assert len(read_stub_argv()) == 2
+    assert no_wait == [gemma.RETRY_WAIT_S]
+
+
+def test_still_busy_after_the_retry_is_an_error(stub_bin_dir, read_stub_argv, no_wait, monkeypatch):
+    monkeypatch.setenv("STUB_FAIL_HTTP", "503")
+    monkeypatch.setenv("STUB_FAIL_TIMES", "2")
+    with pytest.raises(GemmaError, match="HTTP 503"):
+        GemmaClient().complete("s", "r", temperature=0.1, max_tokens=1)
+    assert len(read_stub_argv()) == 2
+
+
+def test_other_failures_are_not_retried(stub_bin_dir, read_stub_argv, no_wait, monkeypatch):
+    monkeypatch.setenv("STUB_FAIL", "1")
+    with pytest.raises(GemmaError):
+        GemmaClient().complete("s", "r", temperature=0.1, max_tokens=1)
+    assert len(read_stub_argv()) == 1 and no_wait == []
+
+
+@pytest.fixture
+def env_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    path = tmp_path / "env.txt"
+    monkeypatch.setenv("STUB_ENV_FILE", str(path))
+    return path
+
+
+def test_lig_key_is_handed_to_gemma(stub_bin_dir, env_file, monkeypatch):
+    monkeypatch.setenv("LARM_API_KEY", "sk-gemma-own")
+    monkeypatch.setenv(llm_key.KEY_ENV, "sk-lig")
+    GemmaClient().complete("s", "r", temperature=0.1, max_tokens=1)
+    assert env_file.read_text() == "sk-lig"
+
+
+def test_without_a_lig_key_gemma_keeps_its_own(stub_bin_dir, env_file, monkeypatch):
+    monkeypatch.setenv("LARM_API_KEY", "sk-gemma-own")
+    GemmaClient().complete("s", "r", temperature=0.1, max_tokens=1)
+    assert env_file.read_text() == "sk-gemma-own"
+
+
+def test_status_also_uses_the_lig_key(stub_bin_dir, env_file, monkeypatch):
+    monkeypatch.setenv(llm_key.KEY_ENV, "sk-lig")
+    GemmaClient().status()
+    assert env_file.read_text() == "sk-lig"

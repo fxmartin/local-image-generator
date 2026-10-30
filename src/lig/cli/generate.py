@@ -9,7 +9,7 @@ from lig.backends.base import Backend, EngineUnavailable
 from lig.cli import scripting
 from lig.cli.progress import generation_progress
 from lig.core import config as cfg
-from lig.core import rewriter, run
+from lig.core import llm_key, rewriter, run
 from lig.core.models import GenerateRequest
 from lig.models.registry import RegistryError, load_registry
 
@@ -92,7 +92,10 @@ def _rewrite_request(
     warn and go on when nobody can answer."""
     try:
         expanded = rewriter.rewrite_prompt(
-            request.prompt, settings.endpoint or "", settings.model or ""
+            request.prompt,
+            settings.endpoint or "",
+            settings.model or "",
+            api_key=llm_key.read_api_key(),
         )
     except rewriter.RewriterError as exc:
         typer.echo(f"warning: {exc}", err=True)

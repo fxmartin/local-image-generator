@@ -96,9 +96,14 @@ in Qwen-Image-2.1's documented alpha form (`This is an RGBA image with transpare
 image has alpha channel and the background is transparent.`). Engines without alpha support (`ncnn`)
 exit 4; the sidecar records `transparent`.
 
-`--rewrite` first expands PROMPT through an OpenAI-compatible chat endpoint (llama-server, LM
-Studio, oMLX...) named by `rewriter.endpoint` (the base URL, e.g. `http://localhost:8080/v1`; `/chat/completions`
-is appended) and `rewriter.model` in config (env `LIG_REWRITER__ENDPOINT`, `LIG_REWRITER__MODEL`). The
+`--rewrite` first expands PROMPT through an OpenAI-compatible chat endpoint named by
+`rewriter.endpoint` (the base URL; `/chat/completions` is appended) and `rewriter.model` in config
+(env `LIG_REWRITER__ENDPOINT`, `LIG_REWRITER__MODEL`). On the tailnet that is the larm gateway on
+the M3 Max: `endpoint = "http://100.84.13.82:8800/v1"`, `model = "gemma-4"`. The gateway needs an
+API key, which never goes in config.toml: lig sends `LIG_LLM_API_KEY`, else the contents of `llm.key`
+beside config.toml (`chmod 600`), as a Bearer token, and sends none when neither is set. A `429` or
+`503` (gateway busy loading a model or rate-limiting) is retried once after its `Retry-After`
+(capped at 30 s); a `401` names where the key comes from. The
 expansion is printed to stderr before generation (not with `-q`) and used for the run; the sidecar's
 `prompt` is the expansion and `original_prompt` is what you typed (also the `lig:original_prompt` PNG
 text chunk). The system prompt lives in `lig/core/rewriter.py`. If the endpoint is unreachable or

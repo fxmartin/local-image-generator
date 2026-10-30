@@ -134,7 +134,7 @@ lig generate "a lovely cat holding a sign that says 'qwen'" --size 768x768 --ste
 ```
 
 Defaults: Linux 768x768, 30 steps; macOS 1024x1024, 40 steps. Engine `auto` = `default_host` if set,
-else `mlx` on Apple Silicon with the `mlx` extra, else `sdcpp`. Sizes are multiples of 32. `-q` prints only the path. `--rewrite` expands the prompt via the `[rewriter]` LLM endpoint, `--prompt-from FILE.json` reuses a saved one. Exit codes: 0, 1, 2, 3, 4.
+else `mlx` on Apple Silicon with the `mlx` extra, else `sdcpp`. Sizes are multiples of 32. `-q` prints only the path. `--rewrite` expands the prompt via the `[rewriter]` LLM endpoint (the Mac's larm gateway; key in `LIG_LLM_API_KEY` or `llm.key`, see [reference](docs/reference.md)), `--prompt-from FILE.json` reuses a saved one. Exit codes: 0, 1, 2, 3, 4.
 
 ### `lig edit`
 
@@ -222,7 +222,7 @@ the TTL is a no-op. The in-process MLX engine (section 2) reports `warm: "suppor
 lig-series "Create 10 photos black and white of a woman in Paris" --size 768x768 --steps 30
 ```
 
-Asks the local `gemma` for the series settings, then, for each shot in turn, plans it, composes
+Asks `gemma` (the M3 Max's larm gateway; lig's `llm.key` is passed on as `LARM_API_KEY`) for the series settings, then, for each shot in turn, plans it, composes
 the prompt and runs `lig generate PROMPT --seed S --out DIR`; the next `gemma` call waits for the
 render. Each PNG path is printed on stdout, progress on stderr as `[2/3 Title]`. Output goes to
 `series/YYYYMMDD-HHMMSS_<slug>/` (`--out` overrides) with a `series.json` (rewritten after every shot) recording the

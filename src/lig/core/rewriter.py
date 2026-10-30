@@ -2,18 +2,26 @@
 
 import json
 import re
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
 import httpx
 
 from lig.backends.remote import CONNECT_TIMEOUT_S
+from lig.core import llm_key
 
 # A local LLM may be cold-loading, so reading gets far longer than connecting.
 REWRITE_TIMEOUT_S = 120.0
 TEMPERATURE = 0.7
 MAX_TOKENS = 1024
 CHAT_PATH = "/chat/completions"
+# A gateway loading a model or rate-limiting answers 429/503 + Retry-After: wait, retry once.
+RETRY_STATUSES = frozenset({429, 503})
+RETRY_DEFAULT_S = 5.0
+RETRY_MAX_S = 30.0
+
+_sleep = time.sleep  # seam: tests record the wait instead of sleeping
 
 # Modelled on the guidance of Qwen-Image's published prompt rewriter (keep the intent, spell out
 # subject, style, composition and light, keep quoted text verbatim); written fresh rather than
@@ -65,10 +73,43 @@ def _clean(text: str) -> str:
     return text
 
 
+def _retry_wait(response: httpx.Response) -> float:
+    try:
+        seconds = float(response.headers.get("retry-after", ""))
+    except ValueError:
+        return RETRY_DEFAULT_S
+    return min(max(seconds, 0.0), RETRY_MAX_S)
+
+
+def _post(client: httpx.Client, url: str, payload: dict, headers: dict[str, str]) -> httpx.Response:
+    response = client.post(url, json=payload, headers=headers)
+    if response.status_code in RETRY_STATUSES:
+        _sleep(_retry_wait(response))
+        response = client.post(url, json=payload, headers=headers)
+        if response.status_code in RETRY_STATUSES:
+            raise RewriterError(
+                f"the rewriter at {url} is still busy after one retry (HTTP {response.status_code})"
+            )
+    if response.status_code == 401:
+        raise RewriterError(
+            f"the rewriter at {url} rejected the API key (HTTP 401); set {llm_key.KEY_ENV} "
+            f"or put the key in {llm_key.key_path()}"
+        )
+    response.raise_for_status()
+    return response
+
+
 def rewrite_prompt(
-    prompt: str, endpoint: str, model: str, client: httpx.Client | None = None
+    prompt: str,
+    endpoint: str,
+    model: str,
+    client: httpx.Client | None = None,
+    *,
+    api_key: str | None = None,
 ) -> str:
-    """Return the expanded prompt; any failure to get a usable answer raises RewriterError."""
+    """Return the expanded prompt; any failure to get a usable answer raises RewriterError.
+
+    `api_key` goes out as a Bearer token (the larm gateway needs one); None sends no header."""
     payload = {
         "model": model,
         "messages": [
@@ -82,9 +123,9 @@ def rewrite_prompt(
     url = _chat_url(endpoint)
     owns_client = client is None
     client = client or make_client()
+    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
     try:
-        response = client.post(url, json=payload)
-        response.raise_for_status()
+        response = _post(client, url, payload, headers)
         content = response.json()["choices"][0]["message"]["content"]
     except httpx.HTTPError as exc:
         raise RewriterError(f"cannot reach the rewriter at {url}: {exc}") from exc
