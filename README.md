@@ -120,7 +120,7 @@ are under the Qwen Research License (research/evaluation use only).
 
 ## 4. The five commands
 
-Every command that renders writes a PNG plus a JSON sidecar (seed, prompt, engine, timings) to `./outputs` (or `--out
+Every command that renders writes a PNG plus a JSON sidecar (seed, prompt, engine, timings) to `~/Pictures/lig` (or `--out
 DIR`) and prints the PNG path as its last line. `--json` prints one JSON document instead (sidecar plus `path`;
 `seeds`: all images and the sheet; `bench`: the report), `--open` shows the result in the image viewer, and `lig
 --install-completion` completes engine, host and weight names. Exit codes shared by the rendering commands: **0** ok,
@@ -188,7 +188,7 @@ Exit codes: 0 ok; 1 on a sha256 mismatch, a failed or refused download (not enou
 (reachable/unreachable and the engine it serves, from `/v1/health`).
 `lig generate|edit ... --host NAME` runs the job on a `lig serve` listed under `[hosts]` in
 `config.toml` (`m3max = "http://100.x.y.z:7860"`), or on `default_host` when set; progress is
-streamed locally and the PNG and sidecar land in `./outputs` with `remote_host: NAME` and the
+streamed locally and the PNG and sidecar land in `~/Pictures/lig` with `remote_host: NAME` and the
 server's engine details. An unreachable host exits 4 with its URL and the connection error after
 one retry. Remote runs use the 1024x1024, 40-step defaults, not the Linux local fallback.
 `lig config show|init` prints effective settings or writes a commented `config.toml`.

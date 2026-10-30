@@ -23,6 +23,16 @@ class ConfigError(Exception):
     """Raised when the config file or a supplied value cannot be used."""
 
 
+def pictures_dir() -> Path:
+    """The user's Pictures folder (XDG_PICTURES_DIR on Linux, ~/Pictures on macOS)."""
+    return Path(platformdirs.user_pictures_dir())
+
+
+def default_output_dir() -> Path:
+    """Absolute, so renders land in one place whatever directory lig runs from."""
+    return (pictures_dir() / "lig").expanduser().absolute()
+
+
 class ServeSettings(BaseModel):
     # None = tailnet address if Tailscale is up, else loopback (see lig.server.bind).
     bind: str | None = None
@@ -86,7 +96,8 @@ class Settings(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     engine: str = "auto"
-    output_dir: Path = Path("./outputs")
+    # A lambda so the module-level function is looked up per call (tests swap it).
+    output_dir: Path = Field(default_factory=lambda: default_output_dir())
     models_dir: Path = Path(platformdirs.user_cache_dir("lig")) / "models"
     default_host: str | None = None
     # Remote `lig serve` daemons by name, e.g. m3max = "http://100.x.y.z:7860".
@@ -260,8 +271,8 @@ CONFIG_TEMPLATE = """\
 # default_host is set, else mlx on Apple Silicon with the mlx extra installed, else sdcpp.
 # engine = "auto"
 
-# Where generated images are written.
-# output_dir = "./outputs"
+# Where generated images are written (default: the lig folder in your Pictures folder).
+# output_dir = "~/Pictures/lig"
 
 # Where model weights are cached.
 # models_dir = "~/.cache/lig/models"
