@@ -6,6 +6,7 @@ from datetime import datetime
 from functools import partial
 from pathlib import Path
 
+import platformdirs
 import typer
 from pydantic import ValidationError
 from typer.core import TyperGroup
@@ -26,6 +27,21 @@ from lig.series.settings import (
 from lig.series.shots import Shot, plan_shots
 
 MAX_SEED = 2**32
+SERIES_FOLDER = "lig-series"
+
+
+def pictures_dir() -> Path:
+    """The user's Pictures folder (XDG_PICTURES_DIR on Linux, ~/Pictures on macOS)."""
+    return Path(platformdirs.user_pictures_dir())
+
+
+def default_series_root() -> Path:
+    """Absolute, so a series lands in one place whatever directory lig-series runs from."""
+    return (pictures_dir() / SERIES_FOLDER).expanduser().absolute()
+
+
+def _default_series_dir(request: str) -> Path:
+    return default_series_root() / f"{datetime.now():%Y%m%d-%H%M%S}_{slugify(request)}"
 
 
 class _RequestGroup(TyperGroup):
@@ -90,7 +106,7 @@ def _render_plan(
     except SeriesError as error:
         typer.echo(f"error: {error}", err=True)
         raise typer.Exit(error.exit_code) from error
-    series_dir = out or Path("series") / f"{datetime.now():%Y%m%d-%H%M%S}_{slugify(plan.request)}"
+    series_dir = out or _default_series_dir(plan.request)
     done: dict[int, ShotRecord] = {}
     previous_seed = None
     if resume:
@@ -187,7 +203,7 @@ def main(
         None, "--character", help="Save this series' character under NAME, or reuse it if saved."
     ),
     out: Path | None = typer.Option(  # noqa: B008
-        None, "--out", help="Series directory; default series/YYYYMMDD-HHMMSS_<slug>."
+        None, "--out", help="Series directory; default ~/Pictures/lig-series/<timestamp>_<slug>."
     ),
     keep_going: bool = typer.Option(False, "--keep-going", help="Render the rest after a failure."),
     no_sheet: bool = typer.Option(False, "--no-sheet", help="Skip the sheet.png contact sheet."),
@@ -222,7 +238,7 @@ def main(
     if from_plan is not None:
         _render_plan(from_plan, out, resume, seed, _flags(locals()), keep_going, False)
     assert request is not None
-    series_dir = out or Path("series") / f"{datetime.now():%Y%m%d-%H%M%S}_{slugify(request)}"
+    series_dir = out or _default_series_dir(request)
     client = GemmaClient(binary=gemma, timeout=plan_timeout)
     try:
         saved = characters.load(character) if character else None
