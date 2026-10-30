@@ -87,7 +87,7 @@ source; 0.6-0.8 allows a bigger change; above ~0.9 the source barely constrains 
 ## Generating
 
 `lig generate PROMPT [--rewrite | --prompt-from FILE.json] [--size WxH] [--steps N] [--seed S] [--engine E] [--host NAME [--wait]] [--out DIR] [--negative TEXT] [--guidance G] [--transparent] [--force] [--quiet]`
-writes a PNG and a JSON sidecar to `./outputs` (or `--out` / `output_dir`) and prints the PNG path
+writes a PNG and a JSON sidecar to `~/Pictures/lig` (or `--out` / `output_dir`) and prints the PNG path
 as its last line. Flags override `LIG_*` env, which overrides `config.toml`. On Linux, with no
 `--size`/`--steps` flag or config value, it uses 768x768 and 30 steps (the XPS local fallback).
 `--engine fake` renders a seeded gradient without weights.

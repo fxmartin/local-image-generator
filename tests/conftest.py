@@ -10,6 +10,8 @@ from pathlib import Path
 
 import pytest
 
+from lig.core import config
+
 STUBS_DIR = Path(__file__).parent / "stubs"
 # Source file -> the real binary name the adapters look up on PATH.
 STUB_BINARIES = {
@@ -69,6 +71,8 @@ def _isolated_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "xdg-data"))
     for key in [k for k in os.environ if k.startswith("LIG_")]:
         monkeypatch.delenv(key)
+    # Renders without --out go to ./outputs under the test's cwd, never the real ~/Pictures/lig.
+    monkeypatch.setattr(config, "default_output_dir", lambda: Path("outputs"))
 
 
 @pytest.fixture(autouse=True)

@@ -143,6 +143,24 @@ def test_settings_paths_are_paths():
     assert isinstance(cfg.Settings().output_dir, Path)
 
 
+# conftest swaps cfg.default_output_dir for ./outputs; these exercise the real one.
+REAL_DEFAULT_OUTPUT_DIR = cfg.default_output_dir
+
+
+def test_default_output_dir_is_lig_under_pictures(tmp_path, monkeypatch):
+    monkeypatch.setattr(cfg, "pictures_dir", lambda: tmp_path / "Pictures")
+    assert REAL_DEFAULT_OUTPUT_DIR() == tmp_path / "Pictures" / "lig"
+
+
+def test_default_output_dir_is_absolute():
+    assert REAL_DEFAULT_OUTPUT_DIR().is_absolute()
+
+
+def test_settings_default_output_dir_comes_from_default_output_dir(monkeypatch):
+    monkeypatch.setattr(cfg, "default_output_dir", lambda: Path("/pics/lig"))
+    assert cfg.Settings().output_dir == Path("/pics/lig")
+
+
 def test_path_settings_expand_user(tmp_path):
     path = tmp_path / "c.toml"
     path.write_text('models_dir = "~/m"\n')
