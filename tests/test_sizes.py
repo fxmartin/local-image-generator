@@ -54,8 +54,41 @@ def test_sheet_is_labelled_by_size(tmp_path):
     sidecar = json.loads(sheet_path.with_suffix(".json").read_text())
     assert [m["label"] for m in sidecar["members"]] == ["256x256", "512x256"]
     assert [m["seed"] for m in sidecar["members"]] == [7, 7]
-    # 1x2 grid of 512x256 cells: tiles at or under the tile cap are not enlarged
-    assert Image.open(sheet_path).size == (2 * SHEET_TILE_PX, 256)
+    # mixed sizes: one row at the shortest height, tiles at or under the cap not enlarged
+    assert Image.open(sheet_path).size == (256 + 512, 256)
+
+
+def _no_black_columns(sheet):
+    """True when every pixel column holds some non-black pixel (no empty cell or gap)."""
+    rgb = sheet.convert("RGB")
+    return all(
+        any(rgb.getpixel((x, y)) != (0, 0, 0) for y in range(0, rgb.height, 8))
+        for x in range(rgb.width)
+    )
+
+
+def test_mixed_aspect_sheet_has_no_gaps(tmp_path):
+    """#80: landscape and portrait tiles share one row at a common height."""
+    result = _run("--sizes", "512x512,768x448,448x768")
+    assert result.exit_code == 0, result.output
+    sheet = Image.open(next((tmp_path / "outputs").glob("*_sheet.png")))
+    # common height 448 (the shortest, under the cap); 448x768 scales to 261 wide
+    assert sheet.size == (448 + 768 + 261, 448)
+    assert _no_black_columns(sheet)
+
+
+def test_same_size_tiles_keep_the_grid(tmp_path):
+    for name in "abcd":
+        Image.new("RGB", (64, 32), "red").save(tmp_path / f"{name}.png")
+    sheet = build_sheet([(tmp_path / f"{n}.png", 1) for n in "abcd"], tmp_path, "grid")
+    assert Image.open(sheet).size == (2 * 64, 2 * 32)
+
+
+def test_mixed_tiles_above_the_cap_are_capped(tmp_path):
+    Image.new("RGB", (2048, 1024), "red").save(tmp_path / "wide.png")
+    Image.new("RGB", (1024, 2048), "blue").save(tmp_path / "tall.png")
+    sheet = build_sheet([(tmp_path / "wide.png", 1), (tmp_path / "tall.png", 1)], tmp_path, "b")
+    assert Image.open(sheet).size == (2 * SHEET_TILE_PX + SHEET_TILE_PX // 2, SHEET_TILE_PX)
 
 
 def test_invalid_size_exits_2_before_rendering(tmp_path, monkeypatch):

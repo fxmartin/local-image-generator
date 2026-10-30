@@ -1,4 +1,8 @@
-"""Contact sheet: a near-square grid of a batch's renders, each labelled with its seed."""
+"""Contact sheet of a batch's renders, each tile labelled (by seed for `seeds`, size for `sizes`).
+
+Same-size tiles go in a near-square grid; tiles of different sizes go in one row at a
+common height, so landscape and portrait framings sit side by side without empty cells.
+"""
 
 import json
 import math
@@ -23,6 +27,33 @@ def seed_label(_path: Path, seed: int) -> str:
     return f"seed {seed}"
 
 
+Layout = tuple[list[Image.Image], list[tuple[int, int]], tuple[int, int]]
+
+
+def _grid(renders: list[Image.Image]) -> Layout:
+    """Same-size tiles, long edge capped at SHEET_TILE_PX, in a near-square grid."""
+    tiles = []
+    for render in renders:
+        tile = render.copy()
+        tile.thumbnail((SHEET_TILE_PX, SHEET_TILE_PX))
+        tiles.append(tile)
+    rows, cols = grid_shape(len(tiles))
+    cell_w, cell_h = tiles[0].size
+    origins = [((i % cols) * cell_w, (i // cols) * cell_h) for i in range(len(tiles))]
+    return tiles, origins, (cols * cell_w, rows * cell_h)
+
+
+def _row(renders: list[Image.Image]) -> Layout:
+    """Mixed sizes in one row at the shortest height, capped at SHEET_TILE_PX, never enlarged."""
+    height = min(SHEET_TILE_PX, *(r.height for r in renders))
+    tiles = [r.resize((round(r.width * height / r.height), height)) for r in renders]
+    origins, x = [], 0
+    for tile in tiles:
+        origins.append((x, 0))
+        x += tile.width
+    return tiles, origins, (x, height)
+
+
 def build_sheet(
     members: list[tuple[Path, int]],
     out_dir: Path,
@@ -33,21 +64,19 @@ def build_sheet(
 
     `label(path, seed)` names each tile; `lig seeds` labels by seed, `lig sizes` by size.
     """
-    tiles: list[Image.Image] = []
+    renders: list[Image.Image] = []
     for path, _ in members:
         with Image.open(path) as img:
-            tile = img.convert("RGB")
-        tile.thumbnail((SHEET_TILE_PX, SHEET_TILE_PX))
-        tiles.append(tile)
+            renders.append(img.convert("RGB"))
 
-    rows, cols = grid_shape(len(tiles))
-    cell_w = max(t.width for t in tiles)
-    cell_h = max(t.height for t in tiles)
-    sheet = Image.new("RGB", (cols * cell_w, rows * cell_h), "black")
+    if len({r.size for r in renders}) == 1:
+        tiles, origins, size = _grid(renders)
+    else:
+        tiles, origins, size = _row(renders)
+    sheet = Image.new("RGB", size, "black")
     draw = ImageDraw.Draw(sheet)
     labels = [label(path, seed) for path, seed in members]
-    for i, (tile, text) in enumerate(zip(tiles, labels, strict=True)):
-        x, y = (i % cols) * cell_w, (i // cols) * cell_h
+    for tile, (x, y), text in zip(tiles, origins, labels, strict=True):
         sheet.paste(tile, (x, y))
         left, top, right, bottom = draw.textbbox((x + LABEL_PAD, y + LABEL_PAD), text)
         draw.rectangle((left - 2, top - 2, right + 2, bottom + 2), fill="black")
