@@ -6,11 +6,11 @@ from datetime import datetime
 from functools import partial
 from pathlib import Path
 
-import platformdirs
 import typer
 from pydantic import ValidationError
 from typer.core import TyperGroup
 
+from lig.core.config import pictures_dir
 from lig.core.output import slugify
 from lig.series import characters, compose, prompts
 from lig.series.gemma import GemmaClient, GemmaError
@@ -28,11 +28,6 @@ from lig.series.shots import Shot, plan_shots
 
 MAX_SEED = 2**32
 SERIES_FOLDER = "lig-series"
-
-
-def pictures_dir() -> Path:
-    """The user's Pictures folder (XDG_PICTURES_DIR on Linux, ~/Pictures on macOS)."""
-    return Path(platformdirs.user_pictures_dir())
 
 
 def default_series_root() -> Path:
