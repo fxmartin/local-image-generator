@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from lig.series import cli as series_cli
 from lig.series.cli import app
 from lig.series.runner import LIG_ARGV, LigFlags, run_series
 from lig.series.settings import SeriesError, SeriesSettings
@@ -179,18 +180,28 @@ def test_end_to_end_with_fake_engine(tmp_path, monkeypatch):
     assert json.loads((out / "series.json").read_text())["seed"] == 5
 
 
-def test_default_out_dir_is_timestamped_under_cwd(tmp_path, monkeypatch):
+def test_default_out_dir_is_timestamped_under_pictures_not_cwd(tmp_path, monkeypatch):
     gemma = _stub_replies(monkeypatch, tmp_path)
-    monkeypatch.chdir(tmp_path)
+    pictures = tmp_path / "Pictures"
+    monkeypatch.setattr(series_cli, "pictures_dir", lambda: pictures)
+    cwd = tmp_path / "cwd"
+    cwd.mkdir()
+    monkeypatch.chdir(cwd)
     result = runner.invoke(
         app,
         ["Create 1 photo of a woman in Paris", "--engine", "fake", "--gemma", str(gemma),
          "--size", "256x256", "--steps", "1"],
     )  # fmt: skip
     assert result.exit_code == 0, result.output
-    dirs = list((tmp_path / "series").iterdir())
+    dirs = list((pictures / "lig-series").iterdir())
     assert len(dirs) == 1
     assert re.fullmatch(r"\d{8}-\d{6}_create-1-photo.*", dirs[0].name)
+    assert not any(cwd.iterdir())
+    assert str(dirs[0]) in result.stdout  # absolute, so the path printed can be opened anywhere
+
+
+def test_default_series_root_is_absolute():
+    assert series_cli.default_series_root().is_absolute()
 
 
 def test_missing_gemma_exits_4(tmp_path):

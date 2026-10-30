@@ -225,7 +225,7 @@ lig-series "Create 10 photos black and white of a woman in Paris" --size 768x768
 Asks `gemma` (the M3 Max's larm gateway; lig's `llm.key` is passed on as `LARM_API_KEY`) for the series settings, then, for each shot in turn, plans it, composes
 the prompt and runs `lig generate PROMPT --seed S --out DIR`; the next `gemma` call waits for the
 render. Each PNG path is printed on stdout, progress on stderr as `[2/3 Title]`. Output goes to
-`series/YYYYMMDD-HHMMSS_<slug>/` (`--out` overrides) with a `series.json` (rewritten after every shot) recording the
+`~/Pictures/lig-series/YYYYMMDD-HHMMSS_<slug>/`, wherever you run it from (`--out` overrides), with a `series.json` (rewritten after every shot) recording the
 request, the plan, the `gemma --status` model, the continuity mode (`prompt`, [the only one](docs/bench/series-continuity.md)), the seed, the `lig` version and,
 per shot, its status (`done`, `failed`, `skipped`), title, prompt, PNG and sidecar paths, `lig` exit
 code and wall time. Every shot shares the look text and one base seed (random unless `--seed`). `--size`, `--steps`,
@@ -249,7 +249,7 @@ renders only the shots without an image, reusing the series' seed (no plan: `--r
 
 ```sh
 lig-series "Create 10 photos black and white of a woman in Paris" --plan-only
-lig-series --from-plan series/20260101-120000_paris/plan.json
+lig-series --from-plan ~/Pictures/lig-series/20260101-120000_paris/plan.json
 ```
 
 `--character NAME` makes the character reusable across series. The first time (and only if the
